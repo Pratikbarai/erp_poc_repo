@@ -17,6 +17,7 @@
   {"fieldname": "style_no", "fieldtype": "Data", "label": "Style No.", "fetch_from": "style.style_no", "read_only": 1, "in_list_view": 1},
   {"fieldname": "style_name", "fieldtype": "Data", "label": "Style Name", "fetch_from": "style.style_name", "read_only": 1},
   {"fieldname": "product_type", "fieldtype": "Data", "label": "Product Type", "fetch_from": "style.product_type", "read_only": 1},
+  {"fieldname": "company", "fieldtype": "Link", "label": "Company", "fetch_from": "style.company", "read_only": 1, "options": "Company"},
   {"fieldname": "category", "fieldtype": "Data", "label": "Category", "fetch_from": "style.category", "read_only": 1},
   {"fieldname": "season", "fieldtype": "Data", "label": "Season", "fetch_from": "style.season", "read_only": 1},
 

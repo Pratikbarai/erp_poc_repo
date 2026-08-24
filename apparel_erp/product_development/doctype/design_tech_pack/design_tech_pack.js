@@ -18,6 +18,7 @@ frappe.ui.form.on("Design Tech Pack", {
 		render_attachments(frm);
 		render_activity(frm);
 		render_next_action(frm);
+		render_design_tech_pack_image_preview(frm);
 	},
 
 	style(frm) {
@@ -422,4 +423,33 @@ function render_next_action(frm) {
 		});
 	});
 	$w.append($btn);
+}
+
+function render_design_tech_pack_image_preview(frm) {
+	const image_fields = ["style_image", "front_sketch", "back_sketch", "construction_diagram"];
+
+	image_fields.forEach(fieldname => {
+		const $field = frm.get_field(fieldname);
+		if (!$field || !$field.$wrapper) return;
+
+		const $wrapper = $field.$wrapper;
+		const $img = $wrapper.find("img");
+		if (!$img.length) return;
+
+		// Ensure image displays as preview thumbnail
+		$img.css("max-width", "100%").css("height", "auto").css("display", "block");
+
+		// Make click non-navigable - just show preview alert
+		const $anchor = $wrapper.find("a");
+		if ($anchor.length) {
+			$anchor.off("click").on("click", function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				frappe.show_alert({
+					message: __("Image preview - click to view details"),
+					indicator: "info"
+				});
+			});
+		}
+	});
 }

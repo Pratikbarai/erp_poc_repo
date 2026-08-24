@@ -6,7 +6,6 @@ const WORKFLOW_STAGES = [
 	"Proto Approval",
 	"Production"
 ];
-
 frappe.ui.form.on("Style", {
 	refresh(frm) {
 		render_matrix(frm);
@@ -26,6 +25,8 @@ frappe.ui.form.on("Style", {
 		if (frm.doc.size_chart) {
 			frm.add_custom_button(__("Size Chart"), () => window.open(frm.doc.size_chart, "_blank"));
 		}
+
+		render_style_image_preview(frm);
 	},
 
 	development_stage(frm) {
@@ -40,14 +41,26 @@ frappe.ui.form.on("Style", {
 	colours_add(frm) {
 		sync_and_render(frm);
 	},
+
 	colours_remove(frm) {
 		sync_and_render(frm);
 	},
 
 	onload(frm) {
 		render_matrix(frm);
+		render_style_image_preview(frm);
 	}
 });
+
+function render_style_image_preview(frm) {
+	if (!frm.doc.style_image) return;
+	const $wrapper = frm.get_field("style_image").$wrapper;
+	$wrapper.find("img").css("max-width", "100%").css("height", "auto");
+	$wrapper.find("a").off("click").on("click", function(e) {
+		e.preventDefault();
+		frappe.show_alert({ message: __("Image preview"), indicator: "info" });
+	});
+}
 
 function open_tech_pack(frm) {
 	frappe.db.get_value("Design Tech Pack", { style: frm.doc.name }, "name").then(r => {
