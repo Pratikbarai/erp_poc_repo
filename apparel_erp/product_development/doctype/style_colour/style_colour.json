@@ -1,0 +1,15 @@
+{
+ "doctype": "DocType",
+ "name": "Style Colour",
+ "module": "Product Development",
+ "istable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "colour_name", "fieldtype": "Data", "label": "Colour Name", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "colour_code", "fieldtype": "Data", "label": "Colour Code", "description": "Short code used in SKU, e.g. WHT, BLU, GRN", "in_list_view": 1},
+  {"fieldname": "swatch", "fieldtype": "Color", "label": "Swatch", "in_list_view": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Active\nInactive", "default": "Active", "in_list_view": 1}
+ ],
+ "permissions": []
+}

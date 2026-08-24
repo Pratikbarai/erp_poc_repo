@@ -1,0 +1,14 @@
+{
+ "doctype": "DocType",
+ "name": "Style Size",
+ "module": "Product Development",
+ "istable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "size", "fieldtype": "Link", "label": "Size", "options": "Size", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "size_code", "fieldtype": "Data", "label": "Size Code", "fetch_from": "size.size_code", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "sequence", "fieldtype": "Int", "label": "Sort Sequence", "in_list_view": 1}
+ ],
+ "permissions": []
+}

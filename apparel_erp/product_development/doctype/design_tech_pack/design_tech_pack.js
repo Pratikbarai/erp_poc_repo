@@ -1,0 +1,425 @@
+const TP_TABS = [
+	{ label: "Style Overview", route: "style", key: "overview" },
+	{ label: "Design & Tech Pack", route: "design-tech-pack", key: "design_tech_pack" },
+	{ label: "BOM", key: "bom" },
+	{ label: "Samples", key: "samples" },
+	{ label: "Costing", key: "costing" },
+	{ label: "Fit Approval", key: "fit_approval" },
+	{ label: "Proto Approval", key: "proto_approval" },
+	{ label: "Production", key: "production" }
+];
+
+frappe.ui.form.on("Design Tech Pack", {
+	refresh(frm) {
+		render_stage_tabs(frm);
+		render_header_actions(frm);
+		load_style_snapshot(frm);
+		render_measurements(frm);
+		render_attachments(frm);
+		render_activity(frm);
+		render_next_action(frm);
+	},
+
+	style(frm) {
+		if (frm.doc.style) {
+			load_style_snapshot(frm);
+		}
+	},
+
+	status(frm) {
+		frm.dirty();
+	}
+});
+
+const TP_STATUSES = ["Not Started", "In Progress", "Completed"];
+
+function render_header_actions(frm) {
+	frm.page.clear_primary_action();
+	frm.page.clear_secondary_action();
+
+	if (frm.is_new()) return;
+
+	frm.page.set_secondary_action(__("Preview Tech Pack (PDF)"), () => frm.print_doc());
+
+	frm.page.set_primary_action(
+		frm.doc.status === "Completed" ? __("Completed") : __("Mark as Completed"),
+		() => set_status(frm, "Completed")
+	);
+
+	// chevron-style dropdown next to the primary action, letting the user jump to any status
+	TP_STATUSES.filter(s => s !== frm.doc.status).forEach(s => {
+		frm.page.add_custom_button(s, () => set_status(frm, s), __("Set Status"));
+	});
+}
+
+function set_status(frm, status) {
+	if (frm.doc.status === status) return;
+	frappe.call({
+		method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.set_status",
+		args: { name: frm.doc.name, status },
+		callback: () => {
+			frappe.show_alert({ message: __("Status set to {0}", [status]), indicator: "green" });
+			frm.reload_doc();
+		}
+	});
+}
+
+function render_stage_tabs(frm) {
+	if (frm.tp_tab_wrapper) frm.tp_tab_wrapper.remove();
+
+	const $wrapper = $(`<div class="tp-stage-tabs"></div>`);
+	TP_TABS.forEach(tab => {
+		const is_active = tab.key === "design_tech_pack";
+		const $tab = $(`<span class="tp-stage-tab ${is_active ? "active" : ""}">${__(tab.label)}</span>`);
+
+		if (tab.key === "overview" && frm.doc.style) {
+			$tab.on("click", () => frappe.set_route("Form", "Style", frm.doc.style));
+		} else if (!is_active) {
+			$tab.addClass("disabled");
+			$tab.attr("title", __("Not built yet - follows the same pattern as this page."));
+			$tab.on("click", () => frappe.show_alert({
+				message: __("{0} is not implemented yet", [__(tab.label)]),
+				indicator: "orange"
+			}));
+		}
+		$wrapper.append($tab);
+	});
+
+	$wrapper.append(`<style>
+		.tp-stage-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border-color); margin-bottom:12px; flex-wrap:wrap; }
+		.tp-stage-tab { padding:8px 12px; cursor:pointer; font-size:13px; color:var(--text-muted); border-bottom:2px solid transparent; }
+		.tp-stage-tab:hover { color:var(--text-color); }
+		.tp-stage-tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+		.tp-stage-tab.disabled { opacity:.5; }
+	</style>`);
+
+	frm.tp_tab_wrapper = $wrapper;
+	$wrapper.insertBefore(frm.layout.wrapper);
+}
+
+function load_style_snapshot(frm) {
+	if (!frm.doc.style) return;
+	frappe.call({
+		method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_style_snapshot",
+		args: { style: frm.doc.style },
+		callback: (r) => {
+			if (!r.message) return;
+			frm.tp_snapshot = r.message;
+			render_colourways(frm, r.message.colours);
+			render_sizerange(frm, r.message.sizes);
+			render_fabric_trims(frm, r.message.bom_items);
+			render_measurements(frm);
+		}
+	});
+}
+
+function render_colourways(frm, colours) {
+	const $w = frm.get_field("colourways_html").$wrapper;
+	if (!colours || !colours.length) {
+		$w.html(`<div class="text-muted">${__("No colours on the Style yet.")}</div>`);
+		return;
+	}
+	let html = `<div class="tp-swatch-row">`;
+	colours.forEach(c => {
+		html += `<div class="tp-swatch">
+			<div class="tp-swatch-box" style="background:${c.swatch || "#eee"}"></div>
+			<div class="tp-swatch-label">${c.colour_code || ""}<br>${frappe.utils.escape_html(c.colour_name)}</div>
+		</div>`;
+	});
+	html += `</div><style>
+		.tp-swatch-row{display:flex;gap:16px;flex-wrap:wrap;}
+		.tp-swatch{text-align:center;font-size:12px;}
+		.tp-swatch-box{width:48px;height:48px;border-radius:6px;border:1px solid var(--border-color);margin-bottom:4px;}
+	</style>`;
+	$w.html(html);
+}
+
+function render_sizerange(frm, sizes) {
+	const $w = frm.get_field("sizerange_html").$wrapper;
+	if (!sizes || !sizes.length) {
+		$w.html(`<div class="text-muted">${__("No sizes selected on the Style yet.")}</div>`);
+		return;
+	}
+	let html = `<div class="tp-size-pills">`;
+	sizes.forEach(s => {
+		html += `<span class="tp-size-pill">${frappe.utils.escape_html(s.size)}</span>`;
+	});
+	if (frm.doc.size_chart) {
+		html += `<span class="tp-size-chart-link">${__("Size Chart")}</span>`;
+	}
+	html += `</div><style>
+		.tp-size-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+		.tp-size-pill{border:1px solid var(--border-color);border-radius:6px;padding:6px 14px;font-weight:600;}
+		.tp-size-chart-link{color:var(--primary);cursor:pointer;font-weight:600;margin-left:8px;}
+	</style>`;
+	$w.html(html);
+	$w.find(".tp-size-chart-link").on("click", () => window.open(frm.doc.size_chart, "_blank"));
+}
+
+const FILE_ICON_MAP = {
+	pdf: { icon: "📕", color: "#e03e2d" },
+	doc: { icon: "📘", color: "#2b579a" },
+	docx: { icon: "📘", color: "#2b579a" },
+	xls: { icon: "📗", color: "#217346" },
+	xlsx: { icon: "📗", color: "#217346" },
+	csv: { icon: "📗", color: "#217346" },
+	ppt: { icon: "📙", color: "#d24726" },
+	pptx: { icon: "📙", color: "#d24726" },
+	ai: { icon: "🎨", color: "#330000" },
+	psd: { icon: "🎨", color: "#001e36" },
+	png: { icon: "🖼️", color: "#666" },
+	jpg: { icon: "🖼️", color: "#666" },
+	jpeg: { icon: "🖼️", color: "#666" },
+	zip: { icon: "🗜️", color: "#666" }
+};
+
+function format_file_size(bytes) {
+	if (!bytes) return "";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function render_attachments(frm) {
+	const $w = frm.get_field("attachments_html").$wrapper;
+	$w.empty();
+
+	let html = `<div class="tp-attach-grid">`;
+	(frm.doc.attachments || []).forEach((row, idx) => {
+		const ext = (row.file_type || (row.file_name || "").split(".").pop() || "").toLowerCase();
+		const meta = FILE_ICON_MAP[ext] || { icon: "📄", color: "#666" };
+		html += `<div class="tp-attach-card" data-idx="${idx}">
+			<div class="tp-attach-icon">${meta.icon}</div>
+			<div class="tp-attach-info">
+				<a href="${row.file}" target="_blank" class="tp-attach-name">${frappe.utils.escape_html(row.file_name || row.file)}</a>
+				<div class="tp-attach-meta">${(ext || "").toUpperCase()}${row.file_size ? " • " + format_file_size(row.file_size) : ""}</div>
+			</div>
+			<span class="tp-attach-remove" data-idx="${idx}" title="${__("Remove")}">&times;</span>
+		</div>`;
+	});
+	html += `<div class="tp-attach-add">+ ${__("Add File")}</div></div>
+	<style>
+		.tp-attach-grid{display:flex;gap:10px;flex-wrap:wrap;}
+		.tp-attach-card{position:relative;display:flex;align-items:center;gap:8px;border:1px solid var(--border-color);
+			border-radius:8px;padding:10px 14px;min-width:180px;}
+		.tp-attach-icon{font-size:22px;}
+		.tp-attach-name{display:block;font-size:12px;font-weight:600;max-width:130px;overflow:hidden;
+			text-overflow:ellipsis;white-space:nowrap;}
+		.tp-attach-meta{font-size:11px;color:var(--text-muted);}
+		.tp-attach-remove{position:absolute;top:4px;right:6px;cursor:pointer;color:var(--text-muted);}
+		.tp-attach-add{display:flex;align-items:center;justify-content:center;min-width:120px;
+			border:2px dashed var(--border-color);border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:12px;}
+	</style>`;
+
+	$w.html(html);
+
+	$w.find(".tp-attach-remove").on("click", function (e) {
+		e.stopPropagation();
+		const idx = $(this).attr("data-idx");
+		frm.doc.attachments.splice(idx, 1);
+		frm.refresh_field("attachments");
+		render_attachments(frm);
+		frm.dirty();
+	});
+
+	$w.find(".tp-attach-add").on("click", () => {
+		new frappe.ui.FileUploader({
+			doctype: "Design Tech Pack",
+			docname: frm.doc.name,
+			on_success: (file) => {
+				frm.add_child("attachments", {
+					file: file.file_url,
+					file_name: file.file_name,
+					file_type: (file.file_name || "").split(".").pop(),
+					file_size: file.file_size
+				});
+				frm.refresh_field("attachments");
+				render_attachments(frm);
+				frm.dirty();
+			}
+		});
+	});
+}
+
+function render_fabric_trims(frm, items) {
+	const $w = frm.get_field("fabric_trims_html").$wrapper;
+	if (!items || !items.length) {
+		$w.html(`<div class="text-muted">${__("No BOM lines on the Style yet.")}</div>`);
+		return;
+	}
+	let html = `<div class="table-responsive"><table class="table table-bordered">
+		<thead><tr><th>#</th><th>${__("Item")}</th><th>${__("Description")}</th>
+		<th>${__("Composition")}</th><th>${__("GSM")}</th><th>${__("Consumption")}</th></tr></thead><tbody>`;
+	let current_group = null;
+	items.forEach((row, idx) => {
+		if (row.item_type !== current_group) {
+			current_group = row.item_type;
+			html += `<tr><td colspan="6"><strong>${frappe.utils.escape_html((current_group || "").toUpperCase())}</strong></td></tr>`;
+		}
+		html += `<tr>
+			<td>${idx + 1}</td>
+			<td>${frappe.utils.escape_html(row.item_name || "")}</td>
+			<td>${frappe.utils.escape_html(row.description || "-")}</td>
+			<td>${frappe.utils.escape_html(row.composition || "-")}</td>
+			<td>${frappe.utils.escape_html(row.gsm || "-")}</td>
+			<td>${frappe.utils.escape_html(row.consumption || "-")}</td>
+		</tr>`;
+	});
+	html += `</tbody></table></div>`;
+	$w.html(html);
+}
+
+function render_measurements(frm) {
+	const $w = frm.get_field("measurements_html").$wrapper;
+	$w.empty();
+
+	const sizes = (frm.tp_snapshot && frm.tp_snapshot.sizes) || [];
+	if (!sizes.length) {
+		$w.html(`<div class="text-muted">${__("Select Sizes on the Style first.")}</div>`);
+		return;
+	}
+
+	const points = [];
+	(frm.doc.measurements || []).forEach(row => {
+		if (!points.find(p => p.measurement_point === row.measurement_point)) {
+			points.push({ measurement_point: row.measurement_point, sequence: row.sequence || points.length + 1 });
+		}
+	});
+	points.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+	let html = `<div class="table-responsive"><table class="table table-bordered tp-measure-table">
+		<thead><tr><th>#</th><th>${__("Measurement Point")}</th>`;
+	sizes.forEach(s => html += `<th class="text-center">${frappe.utils.escape_html(s.size)}</th>`);
+	html += `<th class="text-center">${__("Tol. (+/-)")}</th></tr></thead><tbody>`;
+
+	points.forEach((pt, idx) => {
+		html += `<tr data-point="${frappe.utils.escape_html(pt.measurement_point)}">
+			<td>${idx + 1}</td>
+			<td>${frappe.utils.escape_html(pt.measurement_point)}</td>`;
+		sizes.forEach(s => {
+			const row = (frm.doc.measurements || []).find(
+				m => m.measurement_point === pt.measurement_point && m.size === s.size
+			);
+			html += `<td class="text-center">
+				<input type="number" step="0.01" class="form-control input-sm tp-measure-input"
+					data-size="${frappe.utils.escape_html(s.size)}"
+					value="${row ? row.value : ""}">
+			</td>`;
+		});
+		const tol_row = (frm.doc.measurements || []).find(m => m.measurement_point === pt.measurement_point);
+		html += `<td class="text-center">
+			<input type="number" step="0.01" class="form-control input-sm tp-tolerance-input"
+				value="${tol_row && tol_row.tolerance != null ? tol_row.tolerance : ""}">
+		</td></tr>`;
+	});
+
+	html += `</tbody></table></div>
+	<button class="btn btn-xs btn-default tp-add-point">${__("+ Add Measurement Point")}</button>
+	<style>.tp-measure-table input{width:70px;display:inline-block;}</style>`;
+
+	$w.html(html);
+
+	$w.find(".tp-add-point").on("click", () => {
+		const point_name = prompt(__("Measurement point name (e.g. Chest, Body Length)"));
+		if (!point_name) return;
+		sizes.forEach(s => {
+			frm.add_child("measurements", {
+				measurement_point: point_name,
+				size: s.size,
+				sequence: points.length + 1
+			});
+		});
+		frm.refresh_field("measurements");
+		render_measurements(frm);
+	});
+
+	$w.find(".tp-measure-input").on("change", function () {
+		const $tr = $(this).closest("tr");
+		const point = $tr.attr("data-point");
+		const size = $(this).attr("data-size");
+		const value = parseFloat($(this).val());
+		upsert_measurement_cell(frm, point, size, { value });
+	});
+
+	$w.find(".tp-tolerance-input").on("change", function () {
+		const $tr = $(this).closest("tr");
+		const point = $tr.attr("data-point");
+		const tolerance = parseFloat($(this).val());
+		(frm.doc.measurements || [])
+			.filter(m => m.measurement_point === point)
+			.forEach(m => { m.tolerance = tolerance; });
+		frm.dirty();
+	});
+}
+
+function upsert_measurement_cell(frm, point, size, values) {
+	let row = (frm.doc.measurements || []).find(
+		m => m.measurement_point === point && m.size === size
+	);
+	if (!row) {
+		row = frm.add_child("measurements", { measurement_point: point, size });
+	}
+	Object.assign(row, values);
+	frm.refresh_field("measurements");
+	frm.dirty();
+}
+
+function render_activity(frm) {
+	const $w = frm.get_field("activity_html").$wrapper;
+	if (frm.is_new()) {
+		$w.html(`<div class="text-muted">${__("Save to start the activity log.")}</div>`);
+		return;
+	}
+	$w.html(`<div class="text-muted">${__("Loading...")}</div>`);
+
+	frappe.call({
+		method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_activity_feed",
+		args: { name: frm.doc.name },
+		callback: (r) => {
+			const feed = r.message || [];
+			if (!feed.length) {
+				$w.html(`<div class="text-muted">${__("No activity yet.")}</div>`);
+				return;
+			}
+			let html = `<div class="tp-activity-feed">`;
+			feed.forEach(row => {
+				html += `<div class="tp-activity-row">
+					<div class="tp-activity-meta">${frappe.datetime.str_to_user(row.creation)} &middot; ${frappe.utils.escape_html(row.owner)}</div>
+					<div>${frappe.utils.escape_html(row.message)}</div>
+				</div>`;
+			});
+			html += `</div><style>
+				.tp-activity-row{padding:8px 0;border-bottom:1px solid var(--border-color);}
+				.tp-activity-meta{font-size:11px;color:var(--text-muted);}
+			</style>`;
+			$w.html(html);
+		}
+	});
+}
+
+function render_next_action(frm) {
+	const $w = frm.get_field("next_action_html").$wrapper;
+	$w.empty();
+
+	if (frm.is_new()) {
+		$w.html(`<div class="text-muted">${__("Save first.")}</div>`);
+		return;
+	}
+
+	const $btn = $(`<button class="btn btn-primary btn-sm">${__("Send for Sampling")}</button>`);
+	$btn.on("click", () => {
+		if (frm.is_dirty()) {
+			frappe.msgprint(__("Please save your changes first."));
+			return;
+		}
+		frappe.call({
+			method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.send_for_sampling",
+			args: { name: frm.doc.name, assign_to: frm.doc.assign_to },
+			callback: () => {
+				frappe.show_alert({ message: __("Sent for Sampling"), indicator: "green" });
+				frm.reload_doc();
+			}
+		});
+	});
+	$w.append($btn);
+}
