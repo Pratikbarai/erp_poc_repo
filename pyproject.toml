@@ -1,5 +1,5 @@
 [project]
-name = "apparel_erp_night"
+name = "apparel_erp"
 authors = [
     { name = "Your Company", email = "admin@example.com" }
 ]
