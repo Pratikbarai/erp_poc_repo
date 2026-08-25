@@ -1,0 +1,45 @@
+/*
+ * Apparel ERP — light desk theming.
+ * Brings the standard Style / Design Tech Pack forms visually in line with
+ * the navy/blue palette used on the Style Workspace page, without changing
+ * any Frappe layout or behaviour. Safe to trim or remove — nothing here is
+ * required for the app to function.
+ */
+
+:root {
+	--apparel-navy: #0F172A;
+	--apparel-accent: #2563EB;
+	--apparel-accent-soft: #EFF6FF;
+	--apparel-ok: #15803D;
+	--apparel-ok-bg: #DCFCE7;
+	--apparel-warn: #B45309;
+	--apparel-warn-bg: #FEF3C7;
+	--apparel-bad: #B91C1C;
+	--apparel-bad-bg: #FEE2E2;
+}
+
+/* Primary buttons + form tab underline pick up the workspace accent blue */
+.btn-primary {
+	background-color: var(--apparel-accent) !important;
+	border-color: var(--apparel-accent) !important;
+}
+.form-tabs .nav-link.active {
+	color: var(--apparel-accent) !important;
+	border-bottom-color: var(--apparel-accent) !important;
+}
+
+/* Status indicator pills on Style / Design Tech Pack list + form views */
+.indicator-pill.green, .indicator.green { background: var(--apparel-ok-bg); color: var(--apparel-ok); }
+.indicator-pill.orange, .indicator.orange,
+.indicator-pill.yellow, .indicator.yellow { background: var(--apparel-warn-bg); color: var(--apparel-warn); }
+.indicator-pill.red, .indicator.red { background: var(--apparel-bad-bg); color: var(--apparel-bad); }
+
+/* Section headings inside Style / Design Tech Pack forms */
+.form-section .section-head {
+	letter-spacing: .4px;
+}
+
+/* Workflow stepper + matrix widgets already rendered by style.js / design_tech_pack.js —
+   keep their bubble colours consistent with the workspace page. */
+.tp-wf-bubble.active { background: var(--apparel-accent) !important; border-color: var(--apparel-accent) !important; }
+.apparel-matrix .matrix-generated { color: var(--apparel-accent); }

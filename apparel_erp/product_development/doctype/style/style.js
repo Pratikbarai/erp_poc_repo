@@ -14,6 +14,12 @@ frappe.ui.form.on("Style", {
 		render_status_dropdown(frm);
 		render_size_chart_preview(frm);
 
+		if (!frm.is_new()) {
+			frm.add_custom_button(__("Open Style Workspace"), () => {
+				frappe.set_route("style-workspace", frm.doc.name);
+			}).addClass("btn-primary");
+		}
+
 		frm.add_custom_button(__("Sync Matrix"), () => {
 			frm.save().then(() => render_matrix(frm));
 		});

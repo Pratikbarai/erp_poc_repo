@@ -7,6 +7,9 @@ app_license = "MIT"
 app_version = "0.0.1"
 required_apps = ["frappe"]
 
+# Light navy/blue theming applied to standard desk forms (Style, Design Tech Pack, etc.)
+app_include_css = "/assets/apparel_erp/css/apparel_theme.css"
+
 # Doctype JS injected into forms
 doctype_js = {
     "Style": "apparel_erp/product_development/doctype/style/style.js",
