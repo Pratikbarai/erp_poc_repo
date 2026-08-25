@@ -11,6 +11,8 @@ const TP_TABS = [
 
 frappe.ui.form.on("Design Tech Pack", {
 	refresh(frm) {
+		$(frm.wrapper).addClass("design-tech-pack-form");
+		render_tp_header(frm);
 		render_stage_tabs(frm);
 		render_header_actions(frm);
 		load_style_snapshot(frm);
@@ -19,6 +21,7 @@ frappe.ui.form.on("Design Tech Pack", {
 		render_activity(frm);
 		render_next_action(frm);
 		render_design_tech_pack_image_preview(frm);
+		render_callouts(frm);
 	},
 
 	style(frm) {
@@ -38,7 +41,10 @@ function render_header_actions(frm) {
 	frm.page.clear_primary_action();
 	frm.page.clear_secondary_action();
 
-	if (frm.is_new()) return;
+	if (frm.is_new() || frm.is_dirty()) {
+		frm.page.set_primary_action(__("Save"), () => frm.save());
+		return;
+	}
 
 	frm.page.set_secondary_action(__("Preview Tech Pack (PDF)"), () => frm.print_doc());
 
@@ -86,14 +92,6 @@ function render_stage_tabs(frm) {
 		$wrapper.append($tab);
 	});
 
-	$wrapper.append(`<style>
-		.tp-stage-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border-color); margin-bottom:12px; flex-wrap:wrap; }
-		.tp-stage-tab { padding:8px 12px; cursor:pointer; font-size:13px; color:var(--text-muted); border-bottom:2px solid transparent; }
-		.tp-stage-tab:hover { color:var(--text-color); }
-		.tp-stage-tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
-		.tp-stage-tab.disabled { opacity:.5; }
-	</style>`);
-
 	frm.tp_tab_wrapper = $wrapper;
 	$wrapper.insertBefore(frm.layout.wrapper);
 }
@@ -106,12 +104,58 @@ function load_style_snapshot(frm) {
 		callback: (r) => {
 			if (!r.message) return;
 			frm.tp_snapshot = r.message;
+			Object.entries(r.message.style_fields || {}).forEach(([fieldname, value]) => {
+				if (value == null || fieldname === "status") return;
+				frm.doc[fieldname] = value;
+				frm.refresh_field(fieldname);
+			});
+			render_tp_header(frm);
 			render_colourways(frm, r.message.colours);
 			render_sizerange(frm, r.message.sizes);
 			render_fabric_trims(frm, r.message.bom_items);
 			render_measurements(frm);
+		},
+		error: (r) => {
+			console.error("Unable to load Style data for Design Tech Pack", r);
+			frappe.show_alert({
+				message: __("Unable to load the linked Style data."),
+				indicator: "red"
+			});
 		}
 	});
+}
+
+function render_tp_header(frm) {
+		if (frm.tp_header) frm.tp_header.remove();
+
+		const style_no = frm.doc.style_no || frm.doc.style || __("New Tech Pack");
+		const style_name = frm.doc.style_name || __("Link a Style to begin");
+		const status = frm.doc.status || __("Not Started");
+		const status_class = status === "Completed" ? "done" : status === "In Progress" ? "active" : "pending";
+		const image = frm.doc.style_image
+			? `<img src="${frappe.utils.escape_html(frm.doc.style_image)}" alt="${__("Style image")}">`
+			: `<span class="tp-header-placeholder">${__("No image")}</span>`;
+
+		const $header = $(`<div class="tp-record-header">
+			<div class="tp-record-image">${image}</div>
+			<div class="tp-record-copy">
+				<div class="tp-record-kicker">${__("Design & Tech Pack")} <span>/</span> ${frappe.utils.escape_html(frm.doc.tech_pack_version || "v1.0")}</div>
+				<div class="tp-record-title-row">
+					<h1>${frappe.utils.escape_html(style_no)}</h1>
+					<span class="tp-record-status ${status_class}"><span></span>${frappe.utils.escape_html(status)}</span>
+				</div>
+				<div class="tp-record-subtitle">${frappe.utils.escape_html(style_name)}${frm.doc.customer_brand ? ` <span>·</span> ${frappe.utils.escape_html(frm.doc.customer_brand)}` : ""}${frm.doc.season ? ` <span>·</span> ${frappe.utils.escape_html(frm.doc.season)}` : ""}</div>
+			</div>
+			<div class="tp-record-actions">
+				${frm.doc.style ? `<button type="button" class="btn btn-default btn-sm tp-open-style">${__("Open Style")}</button>` : ""}
+				${!frm.is_new() ? `<button type="button" class="btn btn-default btn-sm tp-preview">${__("Preview PDF")}</button>` : ""}
+			</div>
+		</div>`);
+
+		if (frm.doc.style) $header.find(".tp-open-style").on("click", () => frappe.set_route("Form", "Style", frm.doc.style));
+		if (!frm.is_new()) $header.find(".tp-preview").on("click", () => frm.print_doc());
+		frm.tp_header = $header;
+		$header.insertBefore(frm.layout.wrapper);
 }
 
 function render_colourways(frm, colours) {
@@ -465,5 +509,48 @@ function render_design_tech_pack_image_preview(frm) {
 				});
 			});
 		}
+	});
+}
+
+function render_callouts(frm) {
+	const callouts = frm.doc.callouts || [];
+	const $list = frm.get_field("callouts_html").$wrapper;
+	$list.html(callouts.length ? callouts.map(row => `
+		<div class="tp-callout-row">
+			<span class="tp-callout-number">${row.sequence || ""}</span>
+			<span class="tp-callout-sketch">${frappe.utils.escape_html(row.sketch || "Front")}</span>
+			<span class="tp-callout-text">${frappe.utils.escape_html(row.text || "")}</span>
+		</div>`).join("") : `<div class="text-muted">${__("Click a sketch to add a numbered construction callout.")}</div>`);
+
+	["front_sketch", "back_sketch"].forEach(fieldname => {
+		const sketch = fieldname === "front_sketch" ? "Front" : "Back";
+		const $field = frm.get_field(fieldname);
+		if (!$field || !$field.$wrapper) return;
+		const $wrapper = $field.$wrapper;
+		$wrapper.find(".tp-marker-layer").remove();
+		const $img = $wrapper.find("img").first();
+		if (!$img.length) return;
+
+		$wrapper.css("position", "relative");
+		const $layer = $(`<div class="tp-marker-layer" title="${__("Click to add a callout")}"></div>`);
+		$wrapper.append($layer);
+		callouts.filter(row => (row.sketch || "Front") === sketch).forEach(row => {
+			$layer.append(`<span class="tp-sketch-marker" style="left:${row.x || 0}%;top:${row.y || 0}%">${row.sequence || ""}</span>`);
+		});
+
+		$img.css("cursor", "crosshair").off("click.tp-callout").on("click.tp-callout", function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+			const rect = this.getBoundingClientRect();
+			const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+			const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
+			const text = prompt(__("Construction note for this callout:"));
+			if (!text || !text.trim()) return;
+			const sequence = callouts.reduce((max, row) => Math.max(max, row.sequence || 0), 0) + 1;
+			frm.add_child("callouts", { sequence, text: text.trim(), sketch, x, y });
+			frm.refresh_field("callouts");
+			render_callouts(frm);
+			frm.dirty();
+		});
 	});
 }
