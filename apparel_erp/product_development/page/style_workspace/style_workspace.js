@@ -645,6 +645,7 @@ class StyleWorkspace {
 
 		const refImages = tp.reference_images || [];
 		const attachments = tp.attachments || [];
+		const callouts = (tp.callouts || []).filter(c => (c.sketch || "Front") === "Front");
 
 		$panels.html(`
 			<div class="sw-card">
@@ -660,24 +661,35 @@ class StyleWorkspace {
 					<div class="sw-banner sw-banner-ok"><span>Status: ${frappe.utils.escape_html(tp.status || "Not Started")}${tp.last_updated_on ? " · last updated " + frappe.datetime.str_to_user(tp.last_updated_on) : ""}</span></div>
 				</div>
 			</div>
-			<div class="sw-grid2">
+			<div class="sw-grid2" style="grid-template-columns:1.1fr 1fr">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Sketch</h2></div>
-					<div class="sw-card-b" style="display:flex;gap:10px;flex-wrap:wrap">
-						${tp.front_sketch ? `<img src="${tp.front_sketch}" style="max-width:48%;border-radius:6px;border:1px solid var(--sw-line)">` : ""}
-						${tp.back_sketch ? `<img src="${tp.back_sketch}" style="max-width:48%;border-radius:6px;border:1px solid var(--sw-line)">` : ""}
-						${(!tp.front_sketch && !tp.back_sketch) ? `<div class="sw-empty">No sketches uploaded.</div>` : ""}
+					<div class="sw-card-h"><h2>Front sketch &amp; callouts</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddCallout">+ Add callout</button></div></div>
+					<div class="sw-card-b">
+						${tp.front_sketch
+							? `<div class="sw-flat-wrap" id="swFlatWrap"><img src="${tp.front_sketch}" draggable="false">${callouts.map(c => `<button class="sw-pin" style="left:${c.x}%;top:${c.y}%" data-n="${c.sequence}">${c.sequence}</button>`).join("")}</div>
+							   <div class="sw-note" style="margin-top:8px">Click "+ Add callout" then click anywhere on the sketch to drop a numbered pin. Back sketch is shown below without pins for now.</div>`
+							: `<div class="sw-empty">No front sketch uploaded — upload one on the full tech pack form first.</div>`}
+						${tp.back_sketch ? `<img src="${tp.back_sketch}" style="max-width:100%;margin-top:12px;border-radius:6px;border:1px solid var(--sw-line)">` : ""}
 					</div>
 				</div>
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Construction details</h2></div>
-					<div class="sw-card-b">
-						${sw_attr("Seam type", tp.seam_type)}
-						${sw_attr("Stitch per inch", tp.stitch_per_inch)}
-						${sw_attr("Seam allowance", tp.seam_allowance)}
-						${sw_attr("Overlock", tp.overlock)}
-						${sw_attr("Top stitch", tp.top_stitch)}
+					<div class="sw-card-h"><h2>Construction callouts</h2></div>
+					<div class="sw-card-b" id="swCalloutList" style="padding:8px">
+						${callouts.length ? callouts.map(c => `
+							<div class="sw-callout-row" data-n="${c.sequence}">
+								<span class="sw-n">${c.sequence}</span><span>${frappe.utils.escape_html(c.text)}</span>
+							</div>`).join("") : `<div class="sw-empty" style="padding:8px">No callouts yet — add one from the sketch.</div>`}
 					</div>
+				</div>
+			</div>
+			<div class="sw-card">
+				<div class="sw-card-h"><h2>Construction details</h2></div>
+				<div class="sw-card-b">
+					${sw_attr("Seam type", tp.seam_type)}
+					${sw_attr("Stitch per inch", tp.stitch_per_inch)}
+					${sw_attr("Seam allowance", tp.seam_allowance)}
+					${sw_attr("Overlock", tp.overlock)}
+					${sw_attr("Top stitch", tp.top_stitch)}
 				</div>
 			</div>
 			<div class="sw-card">
@@ -709,10 +721,59 @@ class StyleWorkspace {
 				</div>
 			</div>
 		`);
+		this.tp = tp;
 		$panels.find("#swOpenTPForm").on("click", () => frappe.set_route("Form", "Design Tech Pack", tp.name));
 		$panels.find("#swDownloadPdf").on("click", () => {
 			const url = `/printview?doctype=${encodeURIComponent("Design Tech Pack")}&name=${encodeURIComponent(tp.name)}&format=${encodeURIComponent("Tech Pack Sheet")}&no_letterhead=0`;
 			window.open(url, "_blank");
+		});
+
+		const $wrap = $panels.find("#swFlatWrap");
+		$panels.find("#swAddCallout").on("click", (e) => {
+			const adding = $wrap.toggleClass("adding").hasClass("adding");
+			$(e.currentTarget).text(adding ? "Click the sketch…" : "+ Add callout");
+		});
+		$wrap.on("click", (e) => {
+			if (!$wrap.hasClass("adding") || $(e.target).hasClass("sw-pin")) return;
+			const rect = $wrap[0].getBoundingClientRect();
+			const x = ((e.clientX - rect.left) / rect.width) * 100;
+			const y = ((e.clientY - rect.top) / rect.height) * 100;
+			frappe.prompt(
+				[{ fieldname: "text", label: "Construction note", fieldtype: "Data", reqd: 1 }],
+				(values) => {
+					this.tp.callouts = this.tp.callouts || [];
+					const next_n = this.tp.callouts.filter(c => (c.sketch || "Front") === "Front").length + 1;
+					this.tp.callouts.push({ sequence: next_n, text: values.text, sketch: "Front", x: x.toFixed(2), y: y.toFixed(2) });
+					this.save_techpack_and_refresh();
+				},
+				"Add callout",
+				"Add"
+			);
+			$wrap.removeClass("adding");
+			$panels.find("#swAddCallout").text("+ Add callout");
+		});
+		const select_callout = (n) => {
+			$panels.find(".sw-pin").toggleClass("on", false);
+			$panels.find(`.sw-pin[data-n="${n}"]`).addClass("on");
+			$panels.find(".sw-callout-row").toggleClass("on", false);
+			$panels.find(`.sw-callout-row[data-n="${n}"]`).addClass("on");
+		};
+		$panels.find(".sw-pin").on("click", (e) => select_callout($(e.currentTarget).data("n")));
+		$panels.find(".sw-callout-row").on("click", (e) => select_callout($(e.currentTarget).data("n")));
+	}
+
+	save_techpack_and_refresh() {
+		frappe.dom.freeze("Saving callout…");
+		frappe.call({
+			method: "frappe.client.save",
+			args: { doc: this.tp },
+			callback: (r) => {
+				frappe.dom.unfreeze();
+				sw_toast(this.wrapper, "Callout saved.");
+				const $panels = $(this.wrapper).find("#swPanels");
+				this.tpl_techpack($panels, r.message);
+			},
+			error: () => frappe.dom.unfreeze()
 		});
 	}
 
@@ -865,6 +926,14 @@ const SW_CSS = `
 .sw-picker-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff;border:1px solid var(--sw-line);border-radius:var(--sw-r-sm);cursor:pointer}
 .sw-picker-row:hover{border-color:var(--sw-accent)}
 .sw-loading{padding:30px;color:var(--sw-ink-3);font-size:13px}
+.sw-flat-wrap{position:relative;background:#F8FAFC;border:1px solid var(--sw-line);border-radius:var(--sw-r);overflow:hidden}
+.sw-flat-wrap img{width:100%;display:block;user-select:none}
+.sw-flat-wrap.adding{cursor:crosshair}
+.sw-pin{position:absolute;width:22px;height:22px;border-radius:50%;background:#0D9488;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600;transform:translate(-50%,-50%);cursor:pointer;border:2px solid #fff}
+.sw-pin:hover,.sw-pin.on{background:#0F766E;transform:translate(-50%,-50%) scale(1.15)}
+.sw-callout-row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:var(--sw-r-sm);cursor:pointer;font-size:13px}
+.sw-callout-row:hover,.sw-callout-row.on{background:var(--sw-accent-soft)}
+.sw-callout-row .sw-n{width:20px;height:20px;border-radius:50%;background:#0D9488;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600;flex-shrink:0}
 .sw-scrim{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;z-index:150}
 .sw-scrim.on{display:block}
 .sw-drawer{position:fixed;top:0;right:0;width:400px;max-width:92vw;height:100vh;background:#fff;z-index:151;transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}

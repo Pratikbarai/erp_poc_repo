@@ -270,6 +270,17 @@
       "label": "Back"
     },
     {
+      "fieldname": "callouts_html",
+      "fieldtype": "HTML",
+      "description": "Click on the Front or Back sketch above to drop a numbered pin, then describe the construction detail. Rendered live on the Style Workspace page."
+    },
+    {
+      "fieldname": "callouts",
+      "fieldtype": "Table",
+      "label": "Construction Callouts",
+      "options": "Tech Pack Callout"
+    },
+    {
       "fieldname": "sb_colourways",
       "fieldtype": "Section Break",
       "label": "2. Colourways"
