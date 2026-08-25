@@ -146,15 +146,25 @@ function render_sizerange(frm, sizes) {
 		html += `<span class="tp-size-pill">${frappe.utils.escape_html(s.size)}</span>`;
 	});
 	if (frm.doc.size_chart) {
-		html += `<span class="tp-size-chart-link">${__("Size Chart")}</span>`;
+		if (is_image_file(frm.doc.size_chart)) {
+			html += `<img src="${frm.doc.size_chart}" class="tp-size-chart-preview" alt="${__("Size Chart")}">`;
+		} else {
+			html += `<span class="tp-size-chart-link">${__("Size Chart")}</span>`;
+		}
 	}
 	html += `</div><style>
 		.tp-size-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 		.tp-size-pill{border:1px solid var(--border-color);border-radius:6px;padding:6px 14px;font-weight:600;}
 		.tp-size-chart-link{color:var(--primary);cursor:pointer;font-weight:600;margin-left:8px;}
+		.tp-size-chart-preview{width:96px;height:96px;object-fit:cover;border:1px solid var(--border-color);border-radius:6px;cursor:pointer;margin-left:8px;}
 	</style>`;
 	$w.html(html);
 	$w.find(".tp-size-chart-link").on("click", () => window.open(frm.doc.size_chart, "_blank"));
+	$w.find(".tp-size-chart-preview").on("click", () => window.open(frm.doc.size_chart, "_blank"));
+}
+
+function is_image_file(file_url) {
+	return /\.(png|jpe?g|gif|webp|bmp)(\?.*)?$/i.test(file_url || "");
 }
 
 const FILE_ICON_MAP = {
@@ -189,10 +199,13 @@ function render_attachments(frm) {
 	(frm.doc.attachments || []).forEach((row, idx) => {
 		const ext = (row.file_type || (row.file_name || "").split(".").pop() || "").toLowerCase();
 		const meta = FILE_ICON_MAP[ext] || { icon: "📄", color: "#666" };
+		const file_display = is_image_file(row.file) || ["png", "jpg", "jpeg", "gif", "webp", "bmp"].includes(ext)
+			? `<img src="${row.file}" class="tp-attach-preview" alt="${frappe.utils.escape_html(row.file_name || __("Attachment"))}">`
+			: `<a href="${row.file}" target="_blank" class="tp-attach-name">${frappe.utils.escape_html(row.file_name || row.file)}</a>`;
 		html += `<div class="tp-attach-card" data-idx="${idx}">
-			<div class="tp-attach-icon">${meta.icon}</div>
+			<div class="tp-attach-icon">${file_display}</div>
 			<div class="tp-attach-info">
-				<a href="${row.file}" target="_blank" class="tp-attach-name">${frappe.utils.escape_html(row.file_name || row.file)}</a>
+				${is_image_file(row.file) || ["png", "jpg", "jpeg", "gif", "webp", "bmp"].includes(ext) ? `<div class="tp-attach-name">${frappe.utils.escape_html(row.file_name || row.file)}</div>` : ""}
 				<div class="tp-attach-meta">${(ext || "").toUpperCase()}${row.file_size ? " • " + format_file_size(row.file_size) : ""}</div>
 			</div>
 			<span class="tp-attach-remove" data-idx="${idx}" title="${__("Remove")}">&times;</span>
@@ -204,6 +217,7 @@ function render_attachments(frm) {
 		.tp-attach-card{position:relative;display:flex;align-items:center;gap:8px;border:1px solid var(--border-color);
 			border-radius:8px;padding:10px 14px;min-width:180px;}
 		.tp-attach-icon{font-size:22px;}
+		.tp-attach-preview{width:64px;height:64px;object-fit:cover;border-radius:4px;display:block;cursor:pointer;}
 		.tp-attach-name{display:block;font-size:12px;font-weight:600;max-width:130px;overflow:hidden;
 			text-overflow:ellipsis;white-space:nowrap;}
 		.tp-attach-meta{font-size:11px;color:var(--text-muted);}

@@ -152,10 +152,6 @@ def generate_sku(style, colour_code, size_code):
 				pr.status = "Active"
 				break
 
-	# Submit the Style document after all BOMs are generated
-	if style_doc.docstatus == 0:  # Only submit if not submitted
-		style_doc.submit()
-
 	style_doc.save(ignore_permissions=True)
 	frappe.db.commit()
 
@@ -194,7 +190,10 @@ def _create_bom_for_item(style_doc, item):
 		"BOM", {"item": item.item_code, "is_active": 1, "docstatus": ["<", 2]}, "name"
 	)
 	if existing:
-		return existing
+		existing_bom = frappe.get_doc("BOM", existing)
+		if existing_bom.docstatus == 0:
+			existing_bom.submit()
+		return existing_bom.name
 
 	bom = frappe.new_doc("BOM")
 	bom.item = item.item_code
@@ -212,4 +211,5 @@ def _create_bom_for_item(style_doc, item):
 		})
 
 	bom.insert(ignore_permissions=True)
+	bom.submit()
 	return bom.name

@@ -4,6 +4,12 @@
   "module": "Product Development",
   "fields": [
     {
+      "fieldname": "tab_style_overview",
+      "fieldtype": "Tab Break",
+      "label": "Style Overview",
+      "is_custom_field": false
+    },
+    {
       "fieldname": "col_image",
       "fieldtype": "Column Break"
     },
@@ -106,12 +112,6 @@
     {
       "fieldname": "col_desc",
       "fieldtype": "Column Break"
-    },
-    {
-      "fieldname": "tab_style_overview",
-      "fieldtype": "Tab Break",
-      "label": "Style Overview",
-      "is_custom_field": false
     },
     {
       "fieldname": "description",
@@ -219,12 +219,6 @@
     {
       "fieldname": "workflow_html",
       "fieldtype": "HTML"
-    },
-    {
-      "fieldname": "tab_style_details",
-      "fieldtype": "Tab Break",
-      "label": "Style Details",
-      "is_custom_field": false
     }
   ],
   "modules": [],

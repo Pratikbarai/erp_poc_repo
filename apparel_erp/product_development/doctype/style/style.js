@@ -9,10 +9,10 @@ const WORKFLOW_STAGES = [
 frappe.ui.form.on("Style", {
 	refresh(frm) {
 		render_matrix(frm);
-		render_rest_tab(frm);
 		render_gallery(frm);
 		render_workflow(frm);
 		render_status_dropdown(frm);
+		render_size_chart_preview(frm);
 
 		frm.add_custom_button(__("Sync Matrix"), () => {
 			frm.save().then(() => render_matrix(frm));
@@ -53,6 +53,7 @@ frappe.ui.form.on("Style", {
 	onload(frm) {
 		render_matrix(frm);
 		render_style_image_preview(frm);
+		render_size_chart_preview(frm);
 	}
 });
 
@@ -64,6 +65,23 @@ function render_style_image_preview(frm) {
 		e.preventDefault();
 		frappe.show_alert({ message: __("Image preview"), indicator: "info" });
 	});
+}
+
+function render_size_chart_preview(frm) {
+	if (!frm.doc.size_chart || !/\.(png|jpe?g|gif|webp|bmp)(\?.*)?$/i.test(frm.doc.size_chart)) return;
+	const $wrapper = frm.get_field("size_chart").$wrapper;
+	if ($wrapper.find(".apparel-size-chart-preview").length) return;
+	$wrapper.append(`<img src="${frm.doc.size_chart}" class="apparel-size-chart-preview" alt="${__("Size Chart")}">`);
+	$wrapper.find(".apparel-size-chart-preview").css({
+		"max-width": "160px",
+		"max-height": "160px",
+		"object-fit": "cover",
+		"display": "block",
+		"margin-top": "8px",
+		"border": "1px solid var(--border-color)",
+		"border-radius": "4px",
+		"cursor": "pointer"
+	}).on("click", () => window.open(frm.doc.size_chart, "_blank"));
 }
 
 function open_tech_pack(frm) {

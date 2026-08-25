@@ -11,6 +11,12 @@
   "track_changes": 1,
   "fields": [
     {
+      "fieldname": "tab_style_overview",
+      "fieldtype": "Tab Break",
+      "label": "Style Overview",
+      "is_custom_field": false
+    },
+    {
       "fieldname": "style",
       "fieldtype": "Link",
       "label": "Style",
@@ -104,6 +110,13 @@
       "read_only": 1
     },
     {
+      "fieldname": "country_of_origin",
+      "fieldtype": "Data",
+      "label": "Country of Origin",
+      "fetch_from": "style.country_of_origin",
+      "read_only": 1
+    },
+    {
       "fieldname": "created_on",
       "fieldtype": "Date",
       "label": "Created On",
@@ -161,6 +174,12 @@
       "label": "Style Image",
       "fetch_from": "style.style_image",
       "read_only": 1
+    },
+    {
+      "fieldname": "tab_design_tech_pack",
+      "fieldtype": "Tab Break",
+      "label": "Design & Tech Pack",
+      "is_custom_field": false
     },
     {
       "fieldname": "sb_key_attrs",
@@ -416,6 +435,72 @@
     {
       "fieldname": "next_action_html",
       "fieldtype": "HTML"
+    },
+    {
+      "fieldname": "tab_bom",
+      "fieldtype": "Tab Break",
+      "label": "BOM",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "bom_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "BOM management will be available here."
+    },
+    {
+      "fieldname": "tab_samples",
+      "fieldtype": "Tab Break",
+      "label": "Samples",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "samples_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "Sample tracking will be available here."
+    },
+    {
+      "fieldname": "tab_costing",
+      "fieldtype": "Tab Break",
+      "label": "Costing",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "costing_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "Style costing will be available here."
+    },
+    {
+      "fieldname": "tab_fit_approval",
+      "fieldtype": "Tab Break",
+      "label": "Fit Approval",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "fit_approval_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "Fit approval tracking will be available here."
+    },
+    {
+      "fieldname": "tab_proto_approval",
+      "fieldtype": "Tab Break",
+      "label": "Proto Approval",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "proto_approval_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "Proto approval tracking will be available here."
+    },
+    {
+      "fieldname": "tab_production",
+      "fieldtype": "Tab Break",
+      "label": "Production",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "production_placeholder_html",
+      "fieldtype": "HTML",
+      "options": "Production planning will be available here."
     }
   ],
   "permissions": [
