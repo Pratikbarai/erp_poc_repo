@@ -13,11 +13,6 @@
   "sort_order": "DESC",
   "fields": [
     {
-      "fieldname": "tab_style_info",
-      "fieldtype": "Tab Break",
-      "label": "Style Information"
-    },
-    {
       "fieldname": "col_image",
       "fieldtype": "Column Break"
     },
@@ -171,11 +166,6 @@
       "label": "Fabric Type"
     },
     {
-      "fieldname": "tab_colours_sizes",
-      "fieldtype": "Tab Break",
-      "label": "Colours & Sizes"
-    },
-    {
       "fieldname": "colours",
       "fieldtype": "Table",
       "label": "Colours",
@@ -195,11 +185,6 @@
       "description": "PDF or image shown via the Size Chart button, here and on the Design & Tech Pack."
     },
     {
-      "fieldname": "tab_bom",
-      "fieldtype": "Tab Break",
-      "label": "Style BOM (Base)"
-    },
-    {
       "fieldname": "bom_items",
       "fieldtype": "Table",
       "label": "BOM Items",
@@ -213,11 +198,6 @@
       "default": "Quantities are for size 'M' and base colour. Size/Colour wise consumption can be managed in exceptions."
     },
     {
-      "fieldname": "tab_matrix",
-      "fieldtype": "Tab Break",
-      "label": "Matrix"
-    },
-    {
       "fieldname": "matrix_html",
       "fieldtype": "HTML",
       "label": "Colour - Size Matrix (Auto Generated SKUs)"
@@ -229,11 +209,6 @@
       "options": "Style Matrix Item",
       "read_only": 1,
       "hidden": 1
-    },
-    {
-      "fieldname": "tab_workflow",
-      "fieldtype": "Tab Break",
-      "label": "Development Workflow"
     },
     {
       "fieldname": "development_stage",
