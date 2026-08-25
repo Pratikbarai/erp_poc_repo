@@ -200,7 +200,9 @@ function render_matrix(frm) {
 				frappe.dom.unfreeze();
 				if (r.message && r.message.item) {
 					frappe.show_alert({
-						message: __("SKU {0} created", [r.message.item]),
+						message: r.message.bom
+							? __("SKU {0} and BOM {1} created", [r.message.item, r.message.bom])
+							: __("SKU {0} created (add Style BOM items to generate a BOM)", [r.message.item]),
 						indicator: "green"
 					});
 					// redirect straight into the Item form - Attach Image field
@@ -443,6 +445,7 @@ function generate_all_skus(frm) {
 								// Update the row locally
 								row.sku = r.message.sku;
 								row.item = r.message.item;
+								row.bom = r.message.bom;
 								row.status = "Active";
 								frm.refresh_field("matrix_items");
 							} else {

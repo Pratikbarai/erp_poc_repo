@@ -145,15 +145,13 @@
       "fieldname": "last_updated_on",
       "fieldtype": "Datetime",
       "label": "Last Updated On",
-      "read_only": 1,
-      "fetch_from": "style.last_updated_on"
+      "read_only": 1
     },
     {
       "fieldname": "last_updated_by",
       "fieldtype": "Data",
       "label": "Last Updated By",
-      "read_only": 1,
-      "fetch_from": "style.last_updated_by"
+      "read_only": 1
     },
     {
       "fieldname": "status",
