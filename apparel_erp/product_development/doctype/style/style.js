@@ -18,6 +18,10 @@ frappe.ui.form.on("Style", {
 			frm.save().then(() => render_matrix(frm));
 		});
 
+		frm.add_custom_button(__("Generate All SKUs"), () => {
+			generate_all_skus(frm);
+		});
+
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("Design & Tech Pack"), () => open_tech_pack(frm));
 		}
@@ -370,4 +374,66 @@ function render_rest_tab(frm) {
 	wrapper.find(".copy-rest-url").on("click", function () {
 		frappe.utils.copy_to_clipboard(resource_url);
 	});
+}
+
+function generate_all_skus(frm) {
+	// Check if colours and sizes are available
+	const colours = (frm.doc.colours || []).filter(c => (c.status || "Active") === "Active");
+	const sizes = frm.doc.sizes || [];
+	
+	if (!colours.length || !sizes.length) {
+		frappe.msgprint(__("Please add at least one Colour and select Sizes first."));
+		return;
+	}
+	
+	// Check if any matrix rows need generation
+	const matrix_rows = frm.doc.matrix_items || [];
+	const pending_rows = matrix_rows.filter(m => m.status === "Not Generated");
+	
+	if (!pending_rows.length) {
+		frappe.msgprint(__("All SKUs are already generated."));
+		render_matrix(frm);
+		return;
+	}
+	
+	frappe.confirm(
+		__("Generate SKUs for all {0} Colour x Size combinations?", [pending_rows.length]),
+		() => {
+			frappe.dom.freeze(__("Generating all SKUs & BOMs..."));
+			
+			let generated = 0;
+			let skipped = 0;
+			
+			pending_rows.forEach((row, idx) => {
+				setTimeout(() => {
+					frappe.call({
+						method: "apparel_erp.product_development.doctype.style.style.generate_sku",
+						args: {
+							style: frm.doc.name,
+							colour_code: row.colour_code,
+							size_code: row.size_code
+						},
+						callback: function (r) {
+							if (r.message && r.message.item) {
+								generated++;
+								// Update the row locally
+								row.sku = r.message.sku;
+								row.item = r.message.item;
+								row.status = "Active";
+								frm.refresh_field("matrix_items");
+							} else {
+								skipped++;
+							}
+							
+							if (idx === pending_rows.length - 1) {
+								frappe.dom.unfreeze();
+								frappe.msgprint(__("Generated: {0}, Skipped: {1}", [generated, skipped]));
+								render_matrix(frm);
+							}
+						}
+					});
+				}, idx * 500); // Small delay to avoid overwhelming the server
+			});
+		}
+	);
 }
