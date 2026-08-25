@@ -302,11 +302,17 @@ function render_attachments(frm) {
 
 function render_fabric_trims(frm, items) {
 	const $w = frm.get_field("fabric_trims_html").$wrapper;
+	const edit_button = frm.doc.style
+		? `<button type="button" class="btn btn-default btn-sm tp-edit-bom">${__("Edit BOM")}</button>`
+		: "";
 	if (!items || !items.length) {
-		$w.html(`<div class="text-muted">${__("No BOM lines on the Style yet.")}</div>`);
+		$w.html(`<div class="tp-fabric-trims-toolbar">${edit_button}</div>
+			<div class="text-muted">${__("No BOM lines on the Style yet.")}</div>`);
+		bind_edit_bom(frm, $w);
 		return;
 	}
-	let html = `<div class="table-responsive"><table class="table table-bordered">
+	let html = `<div class="tp-fabric-trims-toolbar">${edit_button}</div>
+		<div class="table-responsive"><table class="table table-bordered">
 		<thead><tr><th>#</th><th>${__("Item")}</th><th>${__("Description")}</th>
 		<th>${__("Composition")}</th><th>${__("GSM")}</th><th>${__("Consumption")}</th></tr></thead><tbody>`;
 	let current_group = null;
@@ -326,6 +332,17 @@ function render_fabric_trims(frm, items) {
 	});
 	html += `</tbody></table></div>`;
 	$w.html(html);
+	bind_edit_bom(frm, $w);
+}
+
+function bind_edit_bom(frm, $wrapper) {
+	$wrapper.find(".tp-edit-bom").on("click", () => {
+		frappe.set_route("style-workspace", frm.doc.style);
+		setTimeout(() => {
+			const workspace = frappe.pages["style-workspace"] && frappe.pages["style-workspace"].wrapper;
+			if (workspace && workspace.style_workspace) workspace.style_workspace.switch_tab("bom");
+		}, 300);
+	});
 }
 
 function render_measurements(frm) {

@@ -72,6 +72,8 @@ def generate_sku(style, colour_code, size_code):
 	SKUs + BOMs and submits the Style."""
 
 	style_doc = frappe.get_doc("Style", style)
+	if not style_doc.bom_items:
+		frappe.throw(_("Add at least one BOM Item before generating SKUs."))
 
 	target_row = None
 	for row in style_doc.matrix_items:
@@ -87,7 +89,8 @@ def generate_sku(style, colour_code, size_code):
 		# Even if already generated, still generate all pending SKUs
 		pass
 
-	sku = f"{style_doc.style_no}-{colour_code}-{size_code}"
+	material_token = _get_material_sku_token(style_doc)
+	sku = f"{style_doc.style_no}-{colour_code}-{size_code}-{material_token}"
 	colour_row = next((c for c in style_doc.colours if c.colour_code == colour_code or c.colour_name == colour_code), None)
 
 	if not frappe.db.exists("Item", sku):
@@ -116,13 +119,9 @@ def generate_sku(style, colour_code, size_code):
 	# Generate ALL pending SKUs + BOMs
 	pending_rows = [r for r in style_doc.matrix_items if r.status == "Not Generated"]
 	for pending_row in pending_rows:
-		# Skip the already-generated row
-		if pending_row.sku and frappe.db.exists("Item", pending_row.sku):
-			continue
-		
 		p_colour_code = pending_row.colour_code
 		p_size_code = pending_row.size_code
-		p_sku = f"{style_doc.style_no}-{p_colour_code}-{p_size_code}"
+		p_sku = f"{style_doc.style_no}-{p_colour_code}-{p_size_code}-{material_token}"
 		p_colour_row = next((c for c in style_doc.colours if c.colour_code == p_colour_code or c.colour_name == p_colour_code), None)
 		
 		if not frappe.db.exists("Item", p_sku):
@@ -139,9 +138,7 @@ def generate_sku(style, colour_code, size_code):
 		else:
 			p_item = frappe.get_doc("Item", p_sku)
 		
-		p_bom_name = None
-		if style_doc.bom_items:
-			p_bom_name = _create_bom_for_item(style_doc, p_item)
+		p_bom_name = _create_bom_for_item(style_doc, p_item)
 		
 		# Find and update the pending row
 		for pr in style_doc.matrix_items:
@@ -155,7 +152,20 @@ def generate_sku(style, colour_code, size_code):
 	style_doc.save(ignore_permissions=True)
 	frappe.db.commit()
 
-	return {"item": item.name, "created": True}
+	return {"item": item.name, "sku": sku, "bom": bom_name, "created": True}
+
+
+def _get_material_sku_token(style_doc):
+	"""Build one stable SKU token from all material rows on the Style."""
+	tokens = []
+	for row in style_doc.bom_items:
+		material = row.raw_material or row.item_name
+		token = frappe.scrub(material).upper().replace("_", "-")
+		if token and token not in tokens:
+			tokens.append(token)
+	return "-".join(tokens)
+
+
 def _get_or_create_item_group(name):
 	if not frappe.db.exists("Item Group", name):
 		ig = frappe.new_doc("Item Group")
