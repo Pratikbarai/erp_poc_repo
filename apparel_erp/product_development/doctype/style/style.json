@@ -1,16 +1,6 @@
 {
   "doctype": "DocType",
   "name": "Style",
-  "module": "Product Development",
-  "autoname": "field:style_no",
-  "naming_rule": "By fieldname",
-  "engine": "InnoDB",
-  "is_submittable": 0,
-  "image_field": "style_image",
-  "title_field": "style_name",
-  "track_changes": 1,
-  "sort_field": "modified",
-  "sort_order": "DESC",
   "fields": [
     {
       "fieldname": "col_image",
@@ -115,6 +105,12 @@
     {
       "fieldname": "col_desc",
       "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "tab_style_overview",
+      "fieldtype": "Tab Break",
+      "label": "Style Overview",
+      "is_custom_field": false
     },
     {
       "fieldname": "description",
@@ -222,8 +218,24 @@
     {
       "fieldname": "workflow_html",
       "fieldtype": "HTML"
+    },
+    {
+      "fieldname": "tab_style_details",
+      "fieldtype": "Tab Break",
+      "label": "Style Details",
+      "is_custom_field": false
     }
   ],
+  "modules": [],
+  "is_submittable": 0,
+  "autoname": "field:style_no",
+  "naming_rule": "By fieldname",
+  "engine": "InnoDB",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "image_field": "style_image",
+  "title_field": "style_name",
+  "track_changes": 1,
   "permissions": [
     {
       "role": "System Manager",
