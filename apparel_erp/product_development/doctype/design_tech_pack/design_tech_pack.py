@@ -26,10 +26,9 @@ def get_style_snapshot(style):
 	"""Read-only data the client renders for Colourways / Size Range / Fabric & Trims.
 	Kept server-side (rather than a raw client frappe.db.get_doc) so a user only needs
 	read access to the Style, not necessarily full doctype metadata permissions."""
-	if not frappe.has_permission("Style", "read", style):
-		frappe.throw(_("Not permitted to read Style {0}").format(style))
-
 	style_doc = frappe.get_doc("Style", style)
+	if not frappe.has_permission("Style", "read", doc=style_doc):
+		frappe.throw(_("Not permitted to read Style {0}").format(style))
 
 	colours = [
 		{
@@ -61,7 +60,34 @@ def get_style_snapshot(style):
 		for b in style_doc.bom_items
 	]
 
-	return {"colours": colours, "sizes": sizes, "bom_items": bom_items}
+	return {
+		"style_fields": {
+			"style_no": style_doc.style_no,
+			"style_name": style_doc.style_name,
+			"product_type": style_doc.product_type,
+			"category": style_doc.category,
+			"season": style_doc.season,
+			"customer_brand": style_doc.customer_brand,
+			"designer": style_doc.designer,
+			"merchandiser": style_doc.merchandiser,
+			"department": style_doc.department,
+			"country_of_origin": style_doc.country_of_origin,
+			"description": style_doc.description,
+			"fit": style_doc.fit,
+			"sleeve": style_doc.sleeve,
+			"placket": style_doc.placket,
+			"collar": style_doc.collar,
+			"gender": style_doc.gender,
+			"fabric_type_field": style_doc.fabric_type,
+			"style_image": style_doc.style_image,
+			"size_chart": style_doc.size_chart,
+			"current_stage": style_doc.development_stage,
+			"created_on": style_doc.creation
+		},
+		"colours": colours,
+		"sizes": sizes,
+		"bom_items": bom_items
+	}
 
 
 @frappe.whitelist()
