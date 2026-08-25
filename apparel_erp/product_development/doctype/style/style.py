@@ -93,8 +93,7 @@ def generate_sku(style, colour_code, size_code):
 		# Even if already generated, still generate all pending SKUs
 		pass
 
-	material_token = _get_material_sku_token(style_doc)
-	sku = f"{style_doc.style_no}-{colour_code}-{size_code}-{material_token}"
+	sku = f"{style_doc.style_no}-{colour_code}-{size_code}"
 	colour_row = next((c for c in style_doc.colours if c.colour_code == colour_code or c.colour_name == colour_code), None)
 
 	if not frappe.db.exists("Item", sku):
@@ -125,7 +124,7 @@ def generate_sku(style, colour_code, size_code):
 	for pending_row in pending_rows:
 		p_colour_code = pending_row.colour_code
 		p_size_code = pending_row.size_code
-		p_sku = f"{style_doc.style_no}-{p_colour_code}-{p_size_code}-{material_token}"
+		p_sku = f"{style_doc.style_no}-{p_colour_code}-{p_size_code}"
 		p_colour_row = next((c for c in style_doc.colours if c.colour_code == p_colour_code or c.colour_name == p_colour_code), None)
 		
 		if not frappe.db.exists("Item", p_sku):
@@ -157,17 +156,6 @@ def generate_sku(style, colour_code, size_code):
 	frappe.db.commit()
 
 	return {"item": item.name, "sku": sku, "bom": bom_name, "created": True}
-
-
-def _get_material_sku_token(style_doc):
-	"""Build one stable SKU token from all material rows on the Style."""
-	tokens = []
-	for row in style_doc.bom_items:
-		material = row.raw_material or row.item_name
-		token = frappe.scrub(material).upper().replace("_", "-")
-		if token and token not in tokens:
-			tokens.append(token)
-	return "-".join(tokens)
 
 
 def _get_or_create_item_group(name):
