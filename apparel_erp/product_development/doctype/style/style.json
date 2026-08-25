@@ -1,6 +1,7 @@
 {
   "doctype": "DocType",
   "name": "Style",
+  "module": "Product Development",
   "fields": [
     {
       "fieldname": "col_image",
