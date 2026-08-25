@@ -49,6 +49,13 @@
       "reqd": 1,
       "in_list_view": 1
     },
+      {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Company",
+      "options": "Company",
+      "reqd": 1
+      },
     {
       "fieldname": "product_type",
       "fieldtype": "Select",
