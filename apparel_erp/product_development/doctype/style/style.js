@@ -347,7 +347,7 @@ function render_workflow(frm) {
 
 function render_status_dropdown(frm) {
 	if (frm.is_new()) return;
-	const statuses = ["Draft", "Active", "On Hold", "Discontinued"];
+	const statuses = ["Not Started", "In Progress", "Completed"];
 	statuses
 		.filter(s => s !== frm.doc.status)
 		.forEach(s => {

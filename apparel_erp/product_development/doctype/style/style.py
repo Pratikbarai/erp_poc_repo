@@ -11,9 +11,13 @@ WORKFLOW_STAGES = [
 	"Production"
 ]
 
+STYLE_STATUSES = ("Not Started", "In Progress", "Completed")
+
 
 class Style(Document):
 	def validate(self):
+		if (self.status or "Not Started") not in STYLE_STATUSES:
+			frappe.throw(_("Status must be one of: {0}").format(", ".join(STYLE_STATUSES)))
 		self.sync_matrix_rows()
 		if not self.development_stage:
 			self.development_stage = "Style Created"

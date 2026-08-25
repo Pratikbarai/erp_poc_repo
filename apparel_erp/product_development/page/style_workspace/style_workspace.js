@@ -180,7 +180,7 @@ class StyleWorkspace {
 						<b>${frappe.utils.escape_html(s.style_no)}</b>
 						<div class="sw-muted">${frappe.utils.escape_html(s.style_name || "")}</div>
 					</div>
-					<span class="sw-pill ${sw_status_pill(s.status)}">${s.status || "Draft"}</span>
+					<span class="sw-pill ${sw_status_pill(s.status)}">${s.status || "Not Started"}</span>
 				</div>`).join(""));
 			$list.find(".sw-picker-row").on("click", function () {
 				frappe.set_route("style-workspace", $(this).data("name"));
@@ -213,7 +213,7 @@ class StyleWorkspace {
 					<div>
 						<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
 							<h1>${frappe.utils.escape_html(s.style_no)}</h1>
-							<span class="sw-pill ${sw_status_pill(s.status)}"><span class="sw-dot"></span>${s.status || "Draft"}</span>
+							<span class="sw-pill ${sw_status_pill(s.status)}"><span class="sw-dot"></span>${s.status || "Not Started"}</span>
 							<span class="sw-pill sw-pill-mut">${s.development_stage || "Style Created"}</span>
 						</div>
 						<div class="sw-sub">${frappe.utils.escape_html(s.style_name || "")} ${s.customer_brand ? " · " + frappe.utils.escape_html(s.customer_brand) : ""} ${s.season ? " · " + frappe.utils.escape_html(s.season) : ""}</div>
@@ -798,9 +798,8 @@ class StyleWorkspace {
 }
 
 function sw_status_pill(status) {
-	if (status === "Active") return "sw-pill-ok";
-	if (status === "On Hold") return "sw-pill-warn";
-	if (status === "Discontinued") return "sw-pill-bad";
+	if (status === "Completed") return "sw-pill-ok";
+	if (status === "In Progress") return "sw-pill-warn";
 	return "sw-pill-mut";
 }
 
