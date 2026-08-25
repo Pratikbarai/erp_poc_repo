@@ -68,7 +68,8 @@ def generate_sku(style, colour_code, size_code):
 	"""Called when a user clicks an empty (or existing) matrix cell.
 	Creates the Item (SKU) + a base BOM from the style's BOM table if they
 	don't already exist, links them on the matrix row, and returns the
-	Item name so the client can redirect to it."""
+	Item name so the client can redirect to it. Also generates all pending
+	SKUs + BOMs and submits the Style."""
 
 	style_doc = frappe.get_doc("Style", style)
 
@@ -83,7 +84,8 @@ def generate_sku(style, colour_code, size_code):
 
 	# Idempotent: if already generated, just return it (used for redirect-on-click too)
 	if target_row.item and frappe.db.exists("Item", target_row.item):
-		return {"item": target_row.item, "created": False}
+		# Even if already generated, still generate all pending SKUs
+		pass
 
 	sku = f"{style_doc.style_no}-{colour_code}-{size_code}"
 	colour_row = next((c for c in style_doc.colours if c.colour_code == colour_code or c.colour_name == colour_code), None)
@@ -110,12 +112,54 @@ def generate_sku(style, colour_code, size_code):
 	target_row.item = item.name
 	target_row.bom = bom_name
 	target_row.status = "Active"
+
+	# Generate ALL pending SKUs + BOMs
+	pending_rows = [r for r in style_doc.matrix_items if r.status == "Not Generated"]
+	for pending_row in pending_rows:
+		# Skip the already-generated row
+		if pending_row.sku and frappe.db.exists("Item", pending_row.sku):
+			continue
+		
+		p_colour_code = pending_row.colour_code
+		p_size_code = pending_row.size_code
+		p_sku = f"{style_doc.style_no}-{p_colour_code}-{p_size_code}"
+		p_colour_row = next((c for c in style_doc.colours if c.colour_code == p_colour_code or c.colour_name == p_colour_code), None)
+		
+		if not frappe.db.exists("Item", p_sku):
+			p_item = frappe.new_doc("Item")
+			p_item.item_code = p_sku
+			p_item.item_name = f"{style_doc.style_name} - {p_colour_row.colour_name if p_colour_row else p_colour_code} - {p_size_code}"
+			p_item.item_group = _get_or_create_item_group(style_doc.product_type or "Finished Goods")
+			p_item.stock_uom = "Nos"
+			p_item.is_stock_item = 1
+			p_item.description = style_doc.description
+			if style_doc.style_image:
+				p_item.image = style_doc.style_image
+			p_item.insert(ignore_permissions=True)
+		else:
+			p_item = frappe.get_doc("Item", p_sku)
+		
+		p_bom_name = None
+		if style_doc.bom_items:
+			p_bom_name = _create_bom_for_item(style_doc, p_item)
+		
+		# Find and update the pending row
+		for pr in style_doc.matrix_items:
+			if pr.colour_code == p_colour_code and pr.size_code == p_size_code:
+				pr.sku = p_sku
+				pr.item = p_item.name
+				pr.bom = p_bom_name
+				pr.status = "Active"
+				break
+
+	# Submit the Style document after all BOMs are generated
+	if style_doc.docstatus == 0:  # Only submit if not submitted
+		style_doc.submit()
+
 	style_doc.save(ignore_permissions=True)
 	frappe.db.commit()
 
 	return {"item": item.name, "created": True}
-
-
 def _get_or_create_item_group(name):
 	if not frappe.db.exists("Item Group", name):
 		ig = frappe.new_doc("Item Group")
