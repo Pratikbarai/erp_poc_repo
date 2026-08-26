@@ -43,6 +43,13 @@
       "in_list_view": 1
     },
     {
+      "fieldname": "base_style",
+      "fieldtype": "Link",
+      "label": "Base Style",
+      "options": "Style",
+      "description": "Optional parent Style whose BOM materials are used when this Style has no own BOM."
+    },
+    {
       "fieldname": "style_name",
       "fieldtype": "Data",
       "label": "Style Name",
@@ -200,6 +207,14 @@
       "label": "Note",
       "read_only": 1,
       "default": "Quantities are for size 'M' and base colour. Size/Colour wise consumption can be managed in exceptions."
+    },
+    {
+      "fieldname": "bom_version",
+      "fieldtype": "Data",
+      "label": "BOM Version",
+      "default": "1.0",
+      "read_only": 1,
+      "in_list_view": 1
     },
     {
       "fieldname": "matrix_html",

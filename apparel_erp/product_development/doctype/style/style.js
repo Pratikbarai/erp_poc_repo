@@ -152,8 +152,13 @@ function render_matrix(frm) {
 
 			html += `<td class="text-center apparel-matrix-cell" data-colour="${colour_code}" data-size="${size_code}">`;
 			if (matrix_row && matrix_row.item) {
-				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${matrix_row.item}">
-					${matrix_row.sku}<br><span class="indicator green">${__("Active")}</span></a>`;
+				const item_label = matrix_row.item_name
+					? `${matrix_row.item_name}${matrix_row.item_code ? ` (${matrix_row.item_code})` : ""}`
+					: matrix_row.item;
+				const item_status = matrix_row.status || "Active";
+				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${frappe.utils.escape_html(matrix_row.item)}">
+					${frappe.utils.escape_html(item_label)}</a>
+					<button type="button" class="btn btn-xs matrix-status-button" data-row="${frappe.utils.escape_html(matrix_row.name)}">${frappe.utils.escape_html(item_status)}</button>`;
 			} else if (matrix_row) {
 				html += `<a href="#" class="matrix-sku matrix-empty">
 					${__("+ Generate")}</a>`;
@@ -171,6 +176,7 @@ function render_matrix(frm) {
 		.apparel-matrix .matrix-sku { display: inline-block; padding: 6px 4px; }
 		.apparel-matrix .matrix-empty { color: var(--text-muted); border: 1px dashed var(--dark-border-color); border-radius: 4px; padding: 6px 10px; }
 		.apparel-matrix .matrix-generated { font-weight: 600; }
+		.apparel-matrix .matrix-status-button { display: block; margin: 2px auto 0; }
 	</style>`;
 
 	wrapper.html(html);
@@ -200,20 +206,37 @@ function render_matrix(frm) {
 				frappe.dom.unfreeze();
 				if (r.message && r.message.item) {
 					frappe.show_alert({
-						message: r.message.bom
-							? __("SKU {0} and BOM {1} created", [r.message.item, r.message.bom])
-							: __("SKU {0} created (add Style BOM items to generate a BOM)", [r.message.item]),
+						message: __("Generated {0} SKU(s), each with {1} BOM material(s).", [r.message.generated_count || 1, r.message.material_count || 0]),
 						indicator: "green"
 					});
-					// redirect straight into the Item form - Attach Image field
-					// previews the style image inline, it is not shown as a bare link
-					frappe.set_route("Form", "Item", r.message.item);
+					frm.reload_doc().then(() => render_matrix(frm));
 				}
 			},
 			error: function () {
 				frappe.dom.unfreeze();
 			}
 		});
+	});
+
+	wrapper.find(".matrix-status-button").on("click", function () {
+		const matrix_item = $(this).attr("data-row");
+		const current_status = $(this).text();
+		const dialog = new frappe.ui.Dialog({
+			title: __("Set Item Status"),
+			fields: [{ fieldname: "status", fieldtype: "Select", label: __("Status"), options: "Active\nDrop\nOn Hold", default: current_status }],
+			primary_action_label: __("Save"),
+			primary_action(values) {
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.style.style.set_matrix_item_status",
+					args: { style: frm.doc.name, matrix_item, status: values.status },
+					callback: () => {
+						dialog.hide();
+						frm.reload_doc().then(() => render_matrix(frm));
+					}
+				});
+			}
+		});
+		dialog.show();
 	});
 }
 
@@ -426,40 +449,25 @@ function generate_all_skus(frm) {
 		__("Generate SKUs for all {0} Colour x Size combinations?", [pending_rows.length]),
 		() => {
 			frappe.dom.freeze(__("Generating all SKUs & BOMs..."));
-			
-			let generated = 0;
-			let skipped = 0;
-			
-			pending_rows.forEach((row, idx) => {
-				setTimeout(() => {
-					frappe.call({
-						method: "apparel_erp.product_development.doctype.style.style.generate_sku",
-						args: {
-							style: frm.doc.name,
-							colour_code: row.colour_code,
-							size_code: row.size_code
-						},
-						callback: function (r) {
-							if (r.message && r.message.item) {
-								generated++;
-								// Update the row locally
-								row.sku = r.message.sku;
-								row.item = r.message.item;
-								row.bom = r.message.bom;
-								row.status = "Active";
-								frm.refresh_field("matrix_items");
-							} else {
-								skipped++;
-							}
-							
-							if (idx === pending_rows.length - 1) {
-								frappe.dom.unfreeze();
-								frappe.msgprint(__("Generated: {0}, Skipped: {1}", [generated, skipped]));
-								render_matrix(frm);
-							}
-						}
-					});
-				}, idx * 500); // Small delay to avoid overwhelming the server
+			frappe.call({
+				method: "apparel_erp.product_development.doctype.style.style.generate_sku",
+				args: {
+					style: frm.doc.name,
+					colour_code: pending_rows[0].colour_code,
+					size_code: pending_rows[0].size_code
+				},
+				callback: function (r) {
+					frappe.dom.unfreeze();
+					if (r.message && r.message.item) {
+						frm.reload_doc().then(() => {
+							frappe.msgprint(__("Generated: {0} SKUs with BOMs.", [pending_rows.length]));
+							render_matrix(frm);
+						});
+					}
+				},
+				error: function () {
+					frappe.dom.unfreeze();
+				}
 			});
 		}
 	);

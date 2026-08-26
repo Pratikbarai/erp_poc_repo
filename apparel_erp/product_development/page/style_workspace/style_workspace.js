@@ -275,6 +275,7 @@ class StyleWorkspace {
 							<div>
 								${sw_attr("Style no", s.style_no)}
 								${sw_attr("Style name", s.style_name)}
+								${s.base_style ? sw_attr_link("Base style", s.base_style, () => frappe.set_route("style-workspace", s.base_style)) : ""}
 								${sw_attr("Product type", s.product_type)}
 								${sw_attr("Category", s.category)}
 								${sw_attr("Season", s.season)}
@@ -353,9 +354,9 @@ class StyleWorkspace {
 					const scode = sz.size_code || sz.size;
 					const row = (s.matrix_items || []).find(m => m.colour_code === ccode && m.size_code === scode);
 					if (row && row.item) {
-						matrix += `<td><a href="#" class="sw-sku" data-item="${row.item}">${frappe.utils.escape_html(row.sku)}</a></td>`;
+							matrix += `<td><a href="#" class="sw-sku" data-item="${frappe.utils.escape_html(row.item)}">${frappe.utils.escape_html(row.sku || row.item)}</a><button class="sw-status sw-matrix-status" data-row="${frappe.utils.escape_html(row.name)}">${frappe.utils.escape_html(row.status || "Active")}</button></td>`;
 					} else if (row) {
-						matrix += `<td><button class="sw-sku sw-sku-gen" data-colour="${ccode}" data-size="${scode}">+ Generate</button></td>`;
+							matrix += `<td><button class="sw-sku sw-sku-gen" data-colour="${frappe.utils.escape_html(ccode)}" data-size="${frappe.utils.escape_html(scode)}">+ Generate</button><span class="sw-status">${frappe.utils.escape_html(row.status || "Not Generated")}</span></td>`;
 					} else {
 						matrix += `<td class="sw-empty">—</td>`;
 					}
@@ -412,6 +413,26 @@ class StyleWorkspace {
 			const colour_code = $(e.currentTarget).data("colour");
 			const size_code = $(e.currentTarget).data("size");
 			this.generate_sku(colour_code, size_code);
+		});
+		$panels.find(".sw-matrix-status").on("click", (e) => {
+			const matrix_item = $(e.currentTarget).data("row");
+			const current_status = $(e.currentTarget).text();
+			const dialog = new frappe.ui.Dialog({
+				title: __("Set Matrix Item Status"),
+				fields: [{ fieldname: "status", fieldtype: "Select", label: __("Status"), options: "Active\nDrop\nOn Hold", default: current_status }],
+				primary_action_label: __("Save"),
+				primary_action: (values) => {
+					frappe.call({
+						method: "apparel_erp.product_development.doctype.style.style.set_matrix_item_status",
+						args: { style: this.style.name, matrix_item, status: values.status },
+						callback: () => {
+							dialog.hide();
+							this.load_style(this.style.name);
+						}
+					});
+				}
+			});
+			dialog.show();
 		});
 		$panels.find("#swGenAll").on("click", () => {
 			const pending = (this.style.matrix_items || []).filter(m => m.status !== "Active" || !m.item);
@@ -505,7 +526,7 @@ class StyleWorkspace {
 			callback: (r) => {
 				frappe.dom.unfreeze();
 				if (r.message && r.message.item) {
-					sw_toast(this.wrapper, `SKU ${r.message.item} created.`);
+					sw_toast(this.wrapper, `Generated ${r.message.generated_count || 1} SKU(s), each with ${r.message.material_count || 0} BOM material(s).`);
 					this.load_style(this.style.name);
 					setTimeout(() => this.switch_tab("colours"), 50);
 				}
@@ -519,7 +540,10 @@ class StyleWorkspace {
 		const rows = s.bom_items || [];
 		let tbl = `<table><thead><tr><th style="width:34px">#</th><th>Type</th><th>Item</th><th style="width:70px">UOM</th><th class="sw-num" style="width:80px">Base qty</th><th style="width:80px">Tolerance</th><th style="width:36px"></th></tr></thead><tbody>`;
 		rows.forEach((r, i) => {
-			tbl += `<tr><td>${i + 1}</td><td>${frappe.utils.escape_html(r.item_type || "")}</td><td>${frappe.utils.escape_html(r.item_name || "")}</td><td>${frappe.utils.escape_html(r.uom || "")}</td><td class="sw-num">${r.base_qty != null ? r.base_qty : ""}</td><td>${frappe.utils.escape_html(r.tolerance || "")}</td><td><span class="sw-x sw-bom-x" data-idx="${i}" title="Remove">&times;</span></td></tr>`;
+			const item_label = r.raw_material
+				? `${r.item_name || "Item"} (${r.raw_material})`
+				: r.item_name || "";
+			tbl += `<tr><td>${i + 1}</td><td>${frappe.utils.escape_html(r.item_type || "")}</td><td>${frappe.utils.escape_html(item_label)}</td><td>${frappe.utils.escape_html(r.uom || "")}</td><td class="sw-num">${r.base_qty != null ? r.base_qty : ""}</td><td>${frappe.utils.escape_html(r.tolerance || "")}</td><td><span class="sw-x sw-bom-x" data-idx="${i}" title="Remove">&times;</span></td></tr>`;
 		});
 		tbl += `</tbody></table>`;
 		if (!rows.length) tbl = `<div class="sw-empty">No BOM items on this style yet.</div>`;
@@ -527,7 +551,7 @@ class StyleWorkspace {
 		return `
 			<div class="sw-grid2" style="grid-template-columns:1.5fr 1fr">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Style BOM — base</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddBom">+ Add item</button></div></div>
+					<div class="sw-card-h"><h2>Style BOM — base</h2><div class="sw-right"><button class="sw-pill sw-pill-mut sw-version-button" id="swBomVersion" title="View BOM version history">v${frappe.utils.escape_html(s.bom_version || "1.0")}</button><button class="sw-btn sw-btn-sm" id="swAddBom">+ Add item</button></div></div>
 					${tbl}
 					<div class="sw-card-b"><div class="sw-note">Quantities are base quantities for this style. Per-size consumption factors aren't modelled in this schema yet — the prototype's factor table is illustrative only.</div></div>
 				</div>
@@ -544,6 +568,11 @@ class StyleWorkspace {
 
 	bind_bom() {
 		const $panels = $(this.wrapper).find("#swPanels");
+		$panels.find("#swBomVersion").on("click", () => this.show_version_history(
+			"BOM Version History",
+			"apparel_erp.product_development.doctype.style.style.get_bom_version_history",
+			{ style: this.style.name }
+		));
 		$panels.find("#swAddBom").on("click", () => this.add_bom_item());
 		$panels.find(".sw-bom-x").on("click", (e) => {
 			const idx = $(e.currentTarget).data("idx");
@@ -559,7 +588,9 @@ class StyleWorkspace {
 		frappe.prompt(
 			[
 				{ fieldname: "item_type", label: "Item Type", fieldtype: "Select", options: "Fabric\nTrim\nPackaging", reqd: 1 },
-				{ fieldname: "item_name", label: "Item Name / Description", fieldtype: "Data", reqd: 1 },
+				{ fieldname: "raw_material", label: "Existing Item", fieldtype: "Link", options: "Item", description: "Select an existing Item, or leave blank to create one from the name below." },
+				{ fieldname: "item_name", label: "New Item Name / Description", fieldtype: "Data" },
+				{ fieldname: "new_item_code", label: "New Item Code", fieldtype: "Data", description: "Required for a new Item. Item Code is unique; Item Name is not." },
 				{ fieldname: "uom", label: "UOM", fieldtype: "Link", options: "UOM", reqd: 1 },
 				{ fieldname: "base_qty", label: "Base Qty", fieldtype: "Float", reqd: 1 },
 				{ fieldname: "tolerance", label: "Tolerance", fieldtype: "Data" },
@@ -567,9 +598,25 @@ class StyleWorkspace {
 				{ fieldname: "gsm", label: "GSM", fieldtype: "Data" }
 			],
 			(values) => {
-				this.style.bom_items = this.style.bom_items || [];
-				this.style.bom_items.push(values);
-				this.save_and_refresh("bom");
+				if (!values.raw_material && (!values.item_name || !values.new_item_code)) {
+					frappe.msgprint("Select an existing Item, or enter both a new Item Name and New Item Code.");
+					return;
+				}
+				const add_row = (item_data) => {
+					this.style.bom_items = this.style.bom_items || [];
+					this.style.bom_items.push({
+						...values,
+						raw_material: values.raw_material || "",
+						item_name: (item_data && item_data.item_name) || values.item_name,
+						uom: values.uom || (item_data && item_data.stock_uom)
+					});
+					this.save_and_refresh("bom");
+				};
+				if (values.raw_material) {
+					frappe.db.get_value("Item", values.raw_material, ["item_name", "stock_uom"]).then(r => add_row(r.message || {}));
+				} else {
+					add_row();
+				}
 			},
 			"Add BOM item",
 			"Add"
@@ -652,7 +699,7 @@ class StyleWorkspace {
 				<div class="sw-card-h">
 					<h2>Tech pack</h2>
 					<div class="sw-right">
-						<span class="sw-pill sw-pill-mut">${frappe.utils.escape_html(tp.tech_pack_version || "v1")}</span>
+						<button class="sw-pill sw-pill-mut sw-version-button" id="swTechPackVersion" title="View Tech Pack version history">${frappe.utils.escape_html(tp.tech_pack_version || "v1")}</button>
 						<button class="sw-btn sw-btn-sm" id="swDownloadPdf">Download PDF</button>
 						<button class="sw-btn sw-btn-sm" id="swOpenTPForm">Open full tech pack</button>
 					</div>
@@ -678,6 +725,7 @@ class StyleWorkspace {
 						${callouts.length ? callouts.map(c => `
 							<div class="sw-callout-row" data-n="${c.sequence}">
 								<span class="sw-n">${c.sequence}</span><span>${frappe.utils.escape_html(c.text)}</span>
+								<button class="sw-btn sw-btn-sm sw-edit-callout" data-name="${frappe.utils.escape_html(c.name || "")}">Edit</button>
 							</div>`).join("") : `<div class="sw-empty" style="padding:8px">No callouts yet — add one from the sketch.</div>`}
 					</div>
 				</div>
@@ -708,7 +756,7 @@ class StyleWorkspace {
 			</div>
 			<div class="sw-grid2">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Reference images</h2></div>
+					<div class="sw-card-h"><h2>Reference images</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddReferenceImage">+ Add image</button></div></div>
 					<div class="sw-card-b" style="display:flex;gap:8px;flex-wrap:wrap">
 						${refImages.length ? refImages.map(ri => `<img src="${ri.image}" title="${frappe.utils.escape_html(ri.label || "")}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--sw-line)">`).join("") : `<div class="sw-empty">No reference images.</div>`}
 					</div>
@@ -723,10 +771,16 @@ class StyleWorkspace {
 		`);
 		this.tp = tp;
 		$panels.find("#swOpenTPForm").on("click", () => frappe.set_route("Form", "Design Tech Pack", tp.name));
+		$panels.find("#swTechPackVersion").on("click", () => this.show_version_history(
+			"Tech Pack Version History",
+			"apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_version_history",
+			{ name: tp.name }
+		));
 		$panels.find("#swDownloadPdf").on("click", () => {
 			const url = `/printview?doctype=${encodeURIComponent("Design Tech Pack")}&name=${encodeURIComponent(tp.name)}&format=${encodeURIComponent("Tech Pack Sheet")}&no_letterhead=0`;
 			window.open(url, "_blank");
 		});
+		$panels.find("#swAddReferenceImage").on("click", () => this.add_reference_image());
 
 		const $wrap = $panels.find("#swFlatWrap");
 		$panels.find("#swAddCallout").on("click", (e) => {
@@ -760,6 +814,82 @@ class StyleWorkspace {
 		};
 		$panels.find(".sw-pin").on("click", (e) => select_callout($(e.currentTarget).data("n")));
 		$panels.find(".sw-callout-row").on("click", (e) => select_callout($(e.currentTarget).data("n")));
+		$panels.find(".sw-edit-callout").on("click", (e) => {
+			e.stopPropagation();
+			const name = $(e.currentTarget).data("name");
+			const callout = this.tp.callouts.find(row => row.name === name);
+			if (callout) this.edit_callout(callout);
+		});
+	}
+
+	edit_callout(callout) {
+		frappe.prompt(
+			[
+				{ fieldname: "text", label: "Construction note", fieldtype: "Data", reqd: 1, default: callout.text },
+				{ fieldname: "sketch", label: "Sketch", fieldtype: "Select", options: "Front\nBack", default: callout.sketch || "Front" },
+				{ fieldname: "x", label: "X (% from left)", fieldtype: "Float", default: callout.x },
+				{ fieldname: "y", label: "Y (% from top)", fieldtype: "Float", default: callout.y }
+			],
+			(values) => {
+				Object.assign(callout, values);
+				this.save_techpack_and_refresh();
+			},
+			"Edit callout",
+			"Save"
+		);
+	}
+
+	add_reference_image() {
+		frappe.prompt(
+			[{ fieldname: "label", label: "Image label", fieldtype: "Data", reqd: 1 }],
+			(values) => {
+				new frappe.ui.FileUploader({
+					doctype: "Design Tech Pack",
+					docname: this.tp.name,
+					on_success: (file) => {
+						this.tp.reference_images = this.tp.reference_images || [];
+						this.tp.reference_images.push({ label: values.label, image: file.file_url });
+						this.save_techpack_and_refresh();
+					}
+				});
+			},
+			"Add reference image",
+			"Upload"
+		);
+	}
+
+	show_version_history(title, method, args) {
+		frappe.call({ method, args }).then(r => {
+			const history = r.message || [];
+			const format_value = (value) => {
+				if (value === null || value === undefined || value === "") return "Empty";
+				if (typeof value === "object") return Object.entries(value)
+					.map(([key, item]) => `${key.replaceAll("_", " ")}: ${format_value(item)}`)
+					.join(", ");
+				return String(value);
+			};
+			const format_change = (change) => {
+				const field = (change.field || "Field").replaceAll("_", " ");
+				if (change.detail) {
+					const action = change.detail[0] || "Updated";
+					const details = change.detail.slice(1).map(format_value).join("; ");
+					return `<div class="sw-history-change"><span class="sw-history-action">${frappe.utils.escape_html(action)}</span><span>${frappe.utils.escape_html(field)}</span>${details ? `<span class="sw-history-detail">${frappe.utils.escape_html(details)}</span>` : ""}</div>`;
+				}
+				return `<div class="sw-history-change"><span>${frappe.utils.escape_html(field)}</span><span class="sw-history-old">${frappe.utils.escape_html(format_value(change.old))}</span><span class="sw-history-arrow">&rarr;</span><span class="sw-history-new">${frappe.utils.escape_html(format_value(change.new))}</span></div>`;
+			};
+			const body = history.length ? `<div class="sw-history-list">${history.map(entry => `
+				<div class="sw-history-entry">
+					<div class="sw-history-entry-head"><strong>${frappe.utils.escape_html(entry.version || "Revision")}</strong><span>${frappe.utils.escape_html(frappe.datetime.str_to_user(entry.creation))}</span><span>by ${frappe.utils.escape_html(entry.owner || "Unknown user")}</span></div>
+					<div>${(entry.changes || []).map(format_change).join("")}</div>
+				</div>`).join("")}</div>` : `<div class="sw-empty">No tracked previous versions yet.</div>`;
+			const styled_body = `${body}<style>
+				.sw-history-entry{border:1px solid var(--sw-line);border-radius:6px;padding:12px 14px;margin-bottom:10px;background:var(--card-bg,#fff)}
+				.sw-history-entry-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}.sw-history-entry-head span{color:var(--text-muted);font-size:12px}
+				.sw-history-change{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--sw-line);text-transform:capitalize}.sw-history-action{font-size:11px;font-weight:600;color:var(--primary)}
+				.sw-history-old{color:var(--text-muted)}.sw-history-new{font-weight:600}.sw-history-arrow{color:var(--text-muted)}.sw-history-detail{color:var(--text-muted);font-size:12px}
+			</style>`;
+			frappe.msgprint({ title, message: styled_body, wide: true });
+		});
 	}
 
 	save_techpack_and_refresh() {

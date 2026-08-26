@@ -105,13 +105,14 @@ function load_style_snapshot(frm) {
 			if (!r.message) return;
 			frm.tp_snapshot = r.message;
 			Object.entries(r.message.style_fields || {}).forEach(([fieldname, value]) => {
-				if (value == null || fieldname === "status") return;
+				if (value == null || fieldname === "status" || fieldname === "tech_pack_version") return;
 				frm.doc[fieldname] = value;
 				frm.refresh_field(fieldname);
 			});
 			render_tp_header(frm);
 			render_colourways(frm, r.message.colours);
 			render_sizerange(frm, r.message.sizes);
+			render_matrix_status(frm, r.message.matrix_items);
 			render_fabric_trims(frm, r.message.bom_items);
 			render_measurements(frm);
 		},
@@ -205,6 +206,20 @@ function render_sizerange(frm, sizes) {
 	$w.html(html);
 	$w.find(".tp-size-chart-link").on("click", () => window.open(frm.doc.size_chart, "_blank"));
 	$w.find(".tp-size-chart-preview").on("click", () => window.open(frm.doc.size_chart, "_blank"));
+}
+
+function render_matrix_status(frm, rows) {
+	const $w = frm.get_field("matrix_status_html").$wrapper;
+	if (!rows || !rows.length) {
+		$w.html(`<div class="text-muted">${__("No SKU matrix rows on the Style yet.")}</div>`);
+		return;
+	}
+	let html = `<div class="table-responsive"><table class="table table-bordered tp-matrix-status"><thead><tr><th>${__("Colour")}</th><th>${__("Size")}</th><th>${__("SKU")}</th><th>${__("BOM")}</th><th>${__("Status")}</th></tr></thead><tbody>`;
+	rows.forEach(row => {
+		html += `<tr><td>${frappe.utils.escape_html(row.colour || row.colour_code || "")}</td><td>${frappe.utils.escape_html(row.size || row.size_code || "")}</td><td>${frappe.utils.escape_html(row.sku || row.item || "-")}</td><td>${frappe.utils.escape_html(row.bom || "-")}</td><td><span class="tp-matrix-status-pill">${frappe.utils.escape_html(row.status || "Not Generated")}</span></td></tr>`;
+	});
+	html += `</tbody></table></div><style>.tp-matrix-status-pill{font-weight:600;}</style>`;
+	$w.html(html);
 }
 
 function is_image_file(file_url) {

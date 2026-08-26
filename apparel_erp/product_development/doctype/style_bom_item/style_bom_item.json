@@ -7,8 +7,9 @@
  "engine": "InnoDB",
  "fields": [
   {"fieldname": "item_type", "fieldtype": "Select", "label": "Item Type", "options": "Fabric\nTrim\nPackaging", "reqd": 1, "in_list_view": 1},
-  {"fieldname": "item_name", "fieldtype": "Data", "label": "Item Name / Description", "reqd": 1, "in_list_view": 1},
-  {"fieldname": "raw_material", "fieldtype": "Link", "label": "Linked Raw Material Item", "options": "Item", "in_list_view": 0},
+    {"fieldname": "item_name", "fieldtype": "Data", "label": "Item Name / Description", "in_list_view": 1},
+    {"fieldname": "raw_material", "fieldtype": "Link", "label": "Existing Item (Code)", "options": "Item", "in_list_view": 1},
+    {"fieldname": "new_item_code", "fieldtype": "Data", "label": "New Item Code", "in_list_view": 0},
   {"fieldname": "uom", "fieldtype": "Link", "label": "UOM", "options": "UOM", "reqd": 1, "in_list_view": 1},
   {"fieldname": "base_qty", "fieldtype": "Float", "label": "Base Qty", "reqd": 1, "in_list_view": 1, "precision": "3"},
   {"fieldname": "tolerance", "fieldtype": "Data", "label": "Tolerance", "in_list_view": 1},
