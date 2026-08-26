@@ -239,6 +239,24 @@ def set_matrix_item_status(style, matrix_item, status):
 	return {"status": status}
 
 
+@frappe.whitelist()
+def set_matrix_item_status(style, matrix_item, status):
+	if status not in MATRIX_ITEM_STATUSES:
+		frappe.throw(_("Status must be one of: {0}").format(", ".join(MATRIX_ITEM_STATUSES)))
+
+	style_doc = frappe.get_doc("Style", style)
+	target_row = next((row for row in style_doc.matrix_items if row.name == matrix_item), None)
+	if not target_row:
+		frappe.throw(_("Matrix item not found: {0}").format(matrix_item))
+	if not target_row.item:
+		frappe.throw(_("Generate the SKU before setting its status."))
+
+	target_row.status = status
+	style_doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"status": status}
+
+
 def _get_or_create_item_group(name):
 	if not frappe.db.exists("Item Group", name):
 		ig = frappe.new_doc("Item Group")
