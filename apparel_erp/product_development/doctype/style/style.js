@@ -152,8 +152,13 @@ function render_matrix(frm) {
 
 			html += `<td class="text-center apparel-matrix-cell" data-colour="${colour_code}" data-size="${size_code}">`;
 			if (matrix_row && matrix_row.item) {
-				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${matrix_row.item}">
-					${matrix_row.sku}<br><span class="indicator green">${__("Active")}</span></a>`;
+				const item_label = matrix_row.item_name
+					? `${matrix_row.item_name}${matrix_row.item_code ? ` (${matrix_row.item_code})` : ""}`
+					: matrix_row.item;
+				const item_status = matrix_row.status || "Active";
+				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${frappe.utils.escape_html(matrix_row.item)}">
+					${frappe.utils.escape_html(item_label)}</a>
+					<button type="button" class="btn btn-xs matrix-status-button" data-row="${frappe.utils.escape_html(matrix_row.name)}">${frappe.utils.escape_html(item_status)}</button>`;
 			} else if (matrix_row) {
 				html += `<a href="#" class="matrix-sku matrix-empty">
 					${__("+ Generate")}</a>`;
@@ -171,6 +176,7 @@ function render_matrix(frm) {
 		.apparel-matrix .matrix-sku { display: inline-block; padding: 6px 4px; }
 		.apparel-matrix .matrix-empty { color: var(--text-muted); border: 1px dashed var(--dark-border-color); border-radius: 4px; padding: 6px 10px; }
 		.apparel-matrix .matrix-generated { font-weight: 600; }
+		.apparel-matrix .matrix-status-button { display: block; margin: 2px auto 0; }
 	</style>`;
 
 	wrapper.html(html);
@@ -214,6 +220,27 @@ function render_matrix(frm) {
 				frappe.dom.unfreeze();
 			}
 		});
+	});
+
+	wrapper.find(".matrix-status-button").on("click", function () {
+		const matrix_item = $(this).attr("data-row");
+		const current_status = $(this).text();
+		const dialog = new frappe.ui.Dialog({
+			title: __("Set Item Status"),
+			fields: [{ fieldname: "status", fieldtype: "Select", label: __("Status"), options: "Active\nDrop\nOn Hold", default: current_status }],
+			primary_action_label: __("Save"),
+			primary_action(values) {
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.style.style.set_matrix_item_status",
+					args: { style: frm.doc.name, matrix_item, status: values.status },
+					callback: () => {
+						dialog.hide();
+						frm.reload_doc().then(() => render_matrix(frm));
+					}
+				});
+			}
+		});
+		dialog.show();
 	});
 }
 

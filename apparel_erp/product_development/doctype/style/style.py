@@ -12,12 +12,20 @@ WORKFLOW_STAGES = [
 ]
 
 STYLE_STATUSES = ("Not Started", "In Progress", "Completed")
+MATRIX_ITEM_STATUSES = ("Active", "Drop", "On Hold")
 
 
 class Style(Document):
 	def validate(self):
 		if (self.status or "Not Started") not in STYLE_STATUSES:
 			frappe.throw(_("Status must be one of: {0}").format(", ".join(STYLE_STATUSES)))
+		previous = self.get_doc_before_save()
+		if not previous:
+			self.bom_version = "1.0"
+		elif self.has_value_changed("bom_items"):
+			self.bom_version = _next_version(previous.bom_version or "1.0")
+		else:
+			self.bom_version = previous.bom_version or "1.0"
 		self.sync_matrix_rows()
 		if not self.development_stage:
 			self.development_stage = "Style Created"
@@ -29,6 +37,14 @@ class Style(Document):
 		existing_keys = {
 			(row.colour_code, row.size_code): row for row in self.matrix_items
 		}
+		for row in self.matrix_items:
+			if row.item and (not row.item_name or not row.item_code):
+				item_data = frappe.db.get_value(
+					"Item", row.item, ["item_name", "item_code"], as_dict=True
+				)
+				if item_data:
+					row.item_name = item_data.item_name
+					row.item_code = item_data.item_code
 
 		active_colours = [c for c in self.colours if (c.status or "Active") == "Active"]
 
@@ -116,6 +132,8 @@ def generate_sku(style, colour_code, size_code):
 
 	target_row.sku = sku
 	target_row.item = item.name
+	target_row.item_name = item.item_name
+	target_row.item_code = item.item_code
 	target_row.bom = bom_name
 	target_row.status = "Active"
 
@@ -148,6 +166,8 @@ def generate_sku(style, colour_code, size_code):
 			if pr.colour_code == p_colour_code and pr.size_code == p_size_code:
 				pr.sku = p_sku
 				pr.item = p_item.name
+				pr.item_name = p_item.item_name
+				pr.item_code = p_item.item_code
 				pr.bom = p_bom_name
 				pr.status = "Active"
 				break
@@ -156,6 +176,24 @@ def generate_sku(style, colour_code, size_code):
 	frappe.db.commit()
 
 	return {"item": item.name, "sku": sku, "bom": bom_name, "created": True}
+
+
+@frappe.whitelist()
+def set_matrix_item_status(style, matrix_item, status):
+	if status not in MATRIX_ITEM_STATUSES:
+		frappe.throw(_("Status must be one of: {0}").format(", ".join(MATRIX_ITEM_STATUSES)))
+
+	style_doc = frappe.get_doc("Style", style)
+	target_row = next((row for row in style_doc.matrix_items if row.name == matrix_item), None)
+	if not target_row:
+		frappe.throw(_("Matrix item not found: {0}").format(matrix_item))
+	if not target_row.item:
+		frappe.throw(_("Generate the SKU before setting its status."))
+
+	target_row.status = status
+	style_doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"status": status}
 
 
 def _get_or_create_item_group(name):
@@ -167,6 +205,54 @@ def _get_or_create_item_group(name):
 		) or "All Item Groups"
 		ig.insert(ignore_permissions=True)
 	return name
+
+
+def _next_version(version):
+	try:
+		major, minor = str(version).lstrip("v").split(".", 1)
+		return f"{major}.{int(minor) + 1}"
+	except (ValueError, AttributeError):
+		return "1.1"
+
+
+@frappe.whitelist()
+def get_bom_version_history(style):
+	style_doc = frappe.get_doc("Style", style)
+	if not frappe.has_permission("Style", "read", doc=style_doc):
+		frappe.throw(_("Not permitted to read Style {0}").format(style))
+
+	import json
+	history = []
+	versions = frappe.get_all(
+		"Version",
+		filters={"ref_doctype": "Style", "docname": style},
+		fields=["data", "owner", "creation"],
+		order_by="creation desc",
+		limit_page_length=20
+	)
+	for version in versions:
+		try:
+			data = json.loads(version.data)
+		except (TypeError, ValueError):
+			continue
+
+		changes = []
+		for changed in data.get("changed", []):
+			if len(changed) >= 3 and changed[0] in ("bom_version", "bom_items"):
+				changes.append({"field": changed[0], "old": changed[1], "new": changed[2]})
+		for row_change in data.get("row_changed", []):
+			if row_change and row_change[0] == "bom_items":
+				changes.append({"field": "bom_items", "detail": row_change[1:]})
+		for row in data.get("added", []):
+			if row and row[0] == "bom_items":
+				changes.append({"field": "bom_items", "detail": ["Added", row[1:]]})
+		for row in data.get("removed", []):
+			if row and row[0] == "bom_items":
+				changes.append({"field": "bom_items", "detail": ["Removed", row[1:]]})
+		if changes:
+			history.append({"version": next((c["new"] for c in changes if c["field"] == "bom_version"), "Revision"), "owner": version.owner, "creation": version.creation, "changes": changes})
+
+	return history
 
 
 def _get_or_create_component_item(row):
