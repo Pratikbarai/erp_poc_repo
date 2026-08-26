@@ -47,23 +47,6 @@ class Style(Document):
 			seen.add(current)
 			current = frappe.db.get_value("Style", current, "base_style")
 
-
-def get_effective_bom_items(style_doc):
-	"""Use this Style's BOM, or walk up the Base Style chain when it has none."""
-	if style_doc.bom_items:
-		return style_doc.bom_items
-	seen = {style_doc.name}
-	current = style_doc.base_style
-	while current:
-		if current in seen:
-			frappe.throw(_("Base Style cycle detected while loading BOM materials."))
-		seen.add(current)
-		base_doc = frappe.get_doc("Style", current)
-		if base_doc.bom_items:
-			return base_doc.bom_items
-		current = base_doc.base_style
-	return []
-
 	def sync_matrix_rows(self):
 		"""Whenever Colours or Sizes change, make sure every Colour x Size
 		combination has a placeholder row in matrix_items. Existing rows
@@ -96,6 +79,22 @@ def get_effective_bom_items(style_doc):
 						"status": "Not Generated"
 					})
 
+
+def get_effective_bom_items(style_doc):
+	"""Use this Style's BOM, or walk up the Base Style chain when it has none."""
+	if style_doc.bom_items:
+		return style_doc.bom_items
+	seen = {style_doc.name}
+	current = style_doc.base_style
+	while current:
+		if current in seen:
+			frappe.throw(_("Base Style cycle detected while loading BOM materials."))
+		seen.add(current)
+		base_doc = frappe.get_doc("Style", current)
+		if base_doc.bom_items:
+			return base_doc.bom_items
+		current = base_doc.base_style
+	return []
 
 @frappe.whitelist()
 def set_development_stage(style, stage):
