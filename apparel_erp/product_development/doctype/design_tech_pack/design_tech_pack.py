@@ -9,6 +9,18 @@ class DesignTechPack(Document):
 	def validate(self):
 		if not self.created_on:
 			self.created_on = frappe.db.get_value("Style", self.style, "creation")
+		previous = self.get_doc_before_save()
+		if not previous:
+			self.tech_pack_version = "1.0"
+		elif any(self.has_value_changed(fieldname) for fieldname in (
+			"front_sketch", "back_sketch", "callouts", "measurements", "seam_type",
+			"stitch_per_inch", "seam_allowance", "overlock", "top_stitch",
+			"special_instructions", "construction_diagram", "reference_images", "attachments",
+			"assign_to"
+		)):
+			self.tech_pack_version = _next_version(previous.tech_pack_version or "1.0")
+		else:
+			self.tech_pack_version = previous.tech_pack_version or "1.0"
 		self.last_updated_on = now_datetime()
 		self.last_updated_by = frappe.session.user
 
@@ -216,3 +228,48 @@ def set_status(name, status):
 def mark_as_completed(name):
 	"""Kept for backwards compatibility - prefer set_status(name, 'Completed')."""
 	return set_status(name, "Completed")
+
+
+@frappe.whitelist()
+def get_version_history(name):
+	doc = frappe.get_doc("Design Tech Pack", name)
+	if not frappe.has_permission("Design Tech Pack", "read", doc=doc):
+		frappe.throw(_("Not permitted to read Design Tech Pack {0}").format(name))
+
+	import json
+	history = []
+	versions = frappe.get_all(
+		"Version",
+		filters={"ref_doctype": "Design Tech Pack", "docname": name},
+		fields=["data", "owner", "creation"],
+		order_by="creation desc",
+		limit_page_length=20
+	)
+	for version in versions:
+		try:
+			data = json.loads(version.data)
+		except (TypeError, ValueError):
+			continue
+
+		changes = []
+		for changed in data.get("changed", []):
+			if len(changed) >= 3 and changed[0] not in ("last_updated_on", "last_updated_by", "modified"):
+				changes.append({"field": changed[0], "old": changed[1], "new": changed[2]})
+		for row_change in data.get("row_changed", []):
+			changes.append({"field": row_change[0], "detail": row_change[1:]})
+		for row in data.get("added", []):
+			changes.append({"field": row[0], "detail": ["Added", row[1:]]})
+		for row in data.get("removed", []):
+			changes.append({"field": row[0], "detail": ["Removed", row[1:]]})
+		if changes:
+			history.append({"version": next((c["new"] for c in changes if c["field"] == "tech_pack_version"), "Revision"), "owner": version.owner, "creation": version.creation, "changes": changes})
+
+	return history
+
+
+def _next_version(version):
+	try:
+		major, minor = str(version).lstrip("v").split(".", 1)
+		return f"{major}.{int(minor) + 1}"
+	except (ValueError, AttributeError):
+		return "1.1"

@@ -139,7 +139,9 @@
       "fieldname": "tech_pack_version",
       "fieldtype": "Data",
       "label": "Tech Pack Version",
-      "default": "1.0"
+      "default": "1.0",
+      "read_only": 1,
+      "in_list_view": 1
     },
     {
       "fieldname": "last_updated_on",

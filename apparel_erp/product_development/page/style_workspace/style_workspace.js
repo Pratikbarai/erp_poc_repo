@@ -527,7 +527,7 @@ class StyleWorkspace {
 		return `
 			<div class="sw-grid2" style="grid-template-columns:1.5fr 1fr">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Style BOM — base</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddBom">+ Add item</button></div></div>
+					<div class="sw-card-h"><h2>Style BOM — base</h2><div class="sw-right"><button class="sw-pill sw-pill-mut sw-version-button" id="swBomVersion" title="View BOM version history">v${frappe.utils.escape_html(s.bom_version || "1.0")}</button><button class="sw-btn sw-btn-sm" id="swAddBom">+ Add item</button></div></div>
 					${tbl}
 					<div class="sw-card-b"><div class="sw-note">Quantities are base quantities for this style. Per-size consumption factors aren't modelled in this schema yet — the prototype's factor table is illustrative only.</div></div>
 				</div>
@@ -544,6 +544,11 @@ class StyleWorkspace {
 
 	bind_bom() {
 		const $panels = $(this.wrapper).find("#swPanels");
+		$panels.find("#swBomVersion").on("click", () => this.show_version_history(
+			"BOM Version History",
+			"apparel_erp.product_development.doctype.style.style.get_bom_version_history",
+			{ style: this.style.name }
+		));
 		$panels.find("#swAddBom").on("click", () => this.add_bom_item());
 		$panels.find(".sw-bom-x").on("click", (e) => {
 			const idx = $(e.currentTarget).data("idx");
@@ -652,7 +657,7 @@ class StyleWorkspace {
 				<div class="sw-card-h">
 					<h2>Tech pack</h2>
 					<div class="sw-right">
-						<span class="sw-pill sw-pill-mut">${frappe.utils.escape_html(tp.tech_pack_version || "v1")}</span>
+						<button class="sw-pill sw-pill-mut sw-version-button" id="swTechPackVersion" title="View Tech Pack version history">${frappe.utils.escape_html(tp.tech_pack_version || "v1")}</button>
 						<button class="sw-btn sw-btn-sm" id="swDownloadPdf">Download PDF</button>
 						<button class="sw-btn sw-btn-sm" id="swOpenTPForm">Open full tech pack</button>
 					</div>
@@ -678,6 +683,7 @@ class StyleWorkspace {
 						${callouts.length ? callouts.map(c => `
 							<div class="sw-callout-row" data-n="${c.sequence}">
 								<span class="sw-n">${c.sequence}</span><span>${frappe.utils.escape_html(c.text)}</span>
+								<button class="sw-btn sw-btn-sm sw-edit-callout" data-name="${frappe.utils.escape_html(c.name || "")}">Edit</button>
 							</div>`).join("") : `<div class="sw-empty" style="padding:8px">No callouts yet — add one from the sketch.</div>`}
 					</div>
 				</div>
@@ -708,7 +714,7 @@ class StyleWorkspace {
 			</div>
 			<div class="sw-grid2">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Reference images</h2></div>
+					<div class="sw-card-h"><h2>Reference images</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddReferenceImage">+ Add image</button></div></div>
 					<div class="sw-card-b" style="display:flex;gap:8px;flex-wrap:wrap">
 						${refImages.length ? refImages.map(ri => `<img src="${ri.image}" title="${frappe.utils.escape_html(ri.label || "")}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--sw-line)">`).join("") : `<div class="sw-empty">No reference images.</div>`}
 					</div>
@@ -723,10 +729,16 @@ class StyleWorkspace {
 		`);
 		this.tp = tp;
 		$panels.find("#swOpenTPForm").on("click", () => frappe.set_route("Form", "Design Tech Pack", tp.name));
+		$panels.find("#swTechPackVersion").on("click", () => this.show_version_history(
+			"Tech Pack Version History",
+			"apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_version_history",
+			{ name: tp.name }
+		));
 		$panels.find("#swDownloadPdf").on("click", () => {
 			const url = `/printview?doctype=${encodeURIComponent("Design Tech Pack")}&name=${encodeURIComponent(tp.name)}&format=${encodeURIComponent("Tech Pack Sheet")}&no_letterhead=0`;
 			window.open(url, "_blank");
 		});
+		$panels.find("#swAddReferenceImage").on("click", () => this.add_reference_image());
 
 		const $wrap = $panels.find("#swFlatWrap");
 		$panels.find("#swAddCallout").on("click", (e) => {
@@ -760,6 +772,65 @@ class StyleWorkspace {
 		};
 		$panels.find(".sw-pin").on("click", (e) => select_callout($(e.currentTarget).data("n")));
 		$panels.find(".sw-callout-row").on("click", (e) => select_callout($(e.currentTarget).data("n")));
+		$panels.find(".sw-edit-callout").on("click", (e) => {
+			e.stopPropagation();
+			const name = $(e.currentTarget).data("name");
+			const callout = this.tp.callouts.find(row => row.name === name);
+			if (callout) this.edit_callout(callout);
+		});
+	}
+
+	edit_callout(callout) {
+		frappe.prompt(
+			[
+				{ fieldname: "text", label: "Construction note", fieldtype: "Data", reqd: 1, default: callout.text },
+				{ fieldname: "sketch", label: "Sketch", fieldtype: "Select", options: "Front\nBack", default: callout.sketch || "Front" },
+				{ fieldname: "x", label: "X (% from left)", fieldtype: "Float", default: callout.x },
+				{ fieldname: "y", label: "Y (% from top)", fieldtype: "Float", default: callout.y }
+			],
+			(values) => {
+				Object.assign(callout, values);
+				this.save_techpack_and_refresh();
+			},
+			"Edit callout",
+			"Save"
+		);
+	}
+
+	add_reference_image() {
+		frappe.prompt(
+			[{ fieldname: "label", label: "Image label", fieldtype: "Data", reqd: 1 }],
+			(values) => {
+				new frappe.ui.FileUploader({
+					doctype: "Design Tech Pack",
+					docname: this.tp.name,
+					on_success: (file) => {
+						this.tp.reference_images = this.tp.reference_images || [];
+						this.tp.reference_images.push({ label: values.label, image: file.file_url });
+						this.save_techpack_and_refresh();
+					}
+				});
+			},
+			"Add reference image",
+			"Upload"
+		);
+	}
+
+	show_version_history(title, method, args) {
+		frappe.call({ method, args }).then(r => {
+			const history = r.message || [];
+			const body = history.length ? history.map(entry => `
+				<div style="border-bottom:1px solid var(--sw-line);padding:8px 0">
+					<strong>${frappe.utils.escape_html(entry.version || "Revision")}</strong>
+					<span class="sw-muted"> — ${frappe.utils.escape_html(frappe.datetime.str_to_user(entry.creation))} by ${frappe.utils.escape_html(entry.owner || "")}</span>
+					<ul style="margin:6px 0 0 18px">${entry.changes.map(change => {
+						const field = frappe.utils.escape_html((change.field || "").replaceAll("_", " "));
+						if (change.detail) return `<li>${field}: ${frappe.utils.escape_html(JSON.stringify(change.detail))}</li>`;
+						return `<li>${field}: ${frappe.utils.escape_html(JSON.stringify(change.old))} &rarr; ${frappe.utils.escape_html(JSON.stringify(change.new))}</li>`;
+					}).join("")}</ul>
+				</div>`).join("") : `<div class="sw-empty">No tracked previous versions yet.</div>`;
+			frappe.msgprint({ title, message: body, wide: true });
+		});
 	}
 
 	save_techpack_and_refresh() {
