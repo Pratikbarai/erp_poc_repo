@@ -94,6 +94,7 @@ def get_style_snapshot(style):
 			"category": style_doc.category,
 			"season": style_doc.season,
 			"customer_brand": style_doc.customer_brand,
+			"company": style_doc.company,
 			"designer": style_doc.designer,
 			"merchandiser": style_doc.merchandiser,
 			"department": style_doc.department,

@@ -160,9 +160,7 @@ def generate_sku(style, colour_code, size_code):
 	else:
 		item = frappe.get_doc("Item", sku)
 
-	bom_name = None
-	if style_doc.bom_items:
-		bom_name = _create_bom_for_item(style_doc, item, bom_items)
+	bom_name = _create_bom_for_item(style_doc, item, bom_items)
 
 	target_row.sku = sku
 	target_row.item = item.name
@@ -171,8 +169,11 @@ def generate_sku(style, colour_code, size_code):
 	target_row.bom = bom_name
 	target_row.status = "Active"
 
-	# Generate ALL pending SKUs + BOMs
-	pending_rows = [r for r in style_doc.matrix_items if r.status == "Not Generated"]
+	# Generate all ungenerated SKUs and repair active rows missing their BOM link.
+	pending_rows = [
+		r for r in style_doc.matrix_items
+		if r.status == "Not Generated" or (r.status == "Active" and r.item and not r.bom)
+	]
 	for pending_row in pending_rows:
 		p_colour_code = pending_row.colour_code
 		p_size_code = pending_row.size_code
