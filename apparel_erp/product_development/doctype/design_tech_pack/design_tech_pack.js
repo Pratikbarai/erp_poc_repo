@@ -1,19 +1,7 @@
-const TP_TABS = [
-	{ label: "Style Overview", route: "style", key: "overview" },
-	{ label: "Design & Tech Pack", route: "design-tech-pack", key: "design_tech_pack" },
-	{ label: "BOM", key: "bom" },
-	{ label: "Samples", key: "samples" },
-	{ label: "Costing", key: "costing" },
-	{ label: "Fit Approval", key: "fit_approval" },
-	{ label: "Proto Approval", key: "proto_approval" },
-	{ label: "Production", key: "production" }
-];
-
 frappe.ui.form.on("Design Tech Pack", {
 	refresh(frm) {
 		$(frm.wrapper).addClass("design-tech-pack-form");
 		render_tp_header(frm);
-		render_stage_tabs(frm);
 		render_header_actions(frm);
 		load_style_snapshot(frm);
 		render_measurements(frm);
@@ -69,31 +57,6 @@ function set_status(frm, status) {
 			frm.reload_doc();
 		}
 	});
-}
-
-function render_stage_tabs(frm) {
-	if (frm.tp_tab_wrapper) frm.tp_tab_wrapper.remove();
-
-	const $wrapper = $(`<div class="tp-stage-tabs"></div>`);
-	TP_TABS.forEach(tab => {
-		const is_active = tab.key === "design_tech_pack";
-		const $tab = $(`<span class="tp-stage-tab ${is_active ? "active" : ""}">${__(tab.label)}</span>`);
-
-		if (tab.key === "overview" && frm.doc.style) {
-			$tab.on("click", () => frappe.set_route("Form", "Style", frm.doc.style));
-		} else if (!is_active) {
-			$tab.addClass("disabled");
-			$tab.attr("title", __("Not built yet - follows the same pattern as this page."));
-			$tab.on("click", () => frappe.show_alert({
-				message: __("{0} is not implemented yet", [__(tab.label)]),
-				indicator: "orange"
-			}));
-		}
-		$wrapper.append($tab);
-	});
-
-	frm.tp_tab_wrapper = $wrapper;
-	$wrapper.insertBefore(frm.layout.wrapper);
 }
 
 function load_style_snapshot(frm) {
@@ -188,7 +151,7 @@ function render_sizerange(frm, sizes) {
 	}
 	let html = `<div class="tp-size-pills">`;
 	sizes.forEach(s => {
-		html += `<span class="tp-size-pill">${frappe.utils.escape_html(s.size)}</span>`;
+		html += `<span class="tp-size-pill">${frappe.utils.escape_html(s.size_code || s.size || "")}</span>`;
 	});
 	if (frm.doc.size_chart) {
 		if (is_image_file(frm.doc.size_chart)) {

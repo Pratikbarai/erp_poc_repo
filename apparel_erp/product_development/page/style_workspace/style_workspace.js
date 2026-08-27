@@ -668,12 +668,17 @@ class StyleWorkspace {
 				$panels.find("#swCreateTP").on("click", () => this.open_tech_pack());
 				return;
 			}
-			frappe.call({ method: "frappe.client.get", args: { doctype: "Design Tech Pack", name: r.message[0].name } })
-				.then(res => this.tpl_techpack($panels, res.message));
+			Promise.all([
+				frappe.call({ method: "frappe.client.get", args: { doctype: "Design Tech Pack", name: r.message[0].name } }),
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_style_snapshot",
+					args: { style: this.style.name }
+				})
+			]).then(([techPack, snapshot]) => this.tpl_techpack($panels, techPack.message, snapshot.message));
 		});
 	}
 
-	tpl_techpack($panels, tp) {
+	tpl_techpack($panels, tp, styleSnapshot) {
 		const sizes = [...new Set((tp.measurements || []).map(m => m.size))];
 		const points = [...new Set((tp.measurements || []).map(m => m.measurement_point))];
 		let pom = `<div class="sw-empty">No measurement points yet.</div>`;
@@ -692,7 +697,7 @@ class StyleWorkspace {
 
 		// Fabric / trims specification is drawn from the real Style BOM rows —
 		// there's no separate table for it on Design Tech Pack.
-		const bomRows = (this.style.bom_items || []);
+		const bomRows = (styleSnapshot && styleSnapshot.bom_items) || this.style.bom_items || [];
 		const fabricRows = bomRows.filter(r => r.item_type === "Fabric");
 		const trimRows = bomRows.filter(r => r.item_type === "Trim" || r.item_type === "Packaging");
 
