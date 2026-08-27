@@ -585,42 +585,60 @@ class StyleWorkspace {
 	}
 
 	add_bom_item() {
-		frappe.prompt(
-			[
+		let selected_item_code = null;
+		const dialog = new frappe.ui.Dialog({
+			title: "Add BOM item",
+			fields: [
 				{ fieldname: "item_type", label: "Item Type", fieldtype: "Select", options: "Fabric\nTrim\nPackaging", reqd: 1 },
-				{ fieldname: "raw_material", label: "Existing Item", fieldtype: "Link", options: "Item", description: "Select an existing Item, or leave blank to create one from the name below." },
-				{ fieldname: "item_name", label: "New Item Name / Description", fieldtype: "Data" },
-				{ fieldname: "new_item_code", label: "New Item Code", fieldtype: "Data", description: "Required for a new Item. Item Code is unique; Item Name is not." },
+				{ fieldname: "item_name", label: "Item Name / Description", fieldtype: "Link", options: "Item", reqd: 1, description: "Select an existing Item, or type a new name to create it." },
 				{ fieldname: "uom", label: "UOM", fieldtype: "Link", options: "UOM", reqd: 1 },
 				{ fieldname: "base_qty", label: "Base Qty", fieldtype: "Float", reqd: 1 },
 				{ fieldname: "tolerance", label: "Tolerance", fieldtype: "Data" },
 				{ fieldname: "composition", label: "Composition", fieldtype: "Data" },
 				{ fieldname: "gsm", label: "GSM", fieldtype: "Data" }
 			],
-			(values) => {
-				if (!values.raw_material && (!values.item_name || !values.new_item_code)) {
-					frappe.msgprint("Select an existing Item, or enter both a new Item Name and New Item Code.");
-					return;
-				}
-				const add_row = (item_data) => {
+			primary_action_label: "Add",
+			primary_action: (values) => {
+				const add_row = (item_data, item_code) => {
 					this.style.bom_items = this.style.bom_items || [];
 					this.style.bom_items.push({
 						...values,
-						raw_material: values.raw_material || "",
-						item_name: (item_data && item_data.item_name) || values.item_name,
-						uom: values.uom || (item_data && item_data.stock_uom)
+						raw_material: item_code || "",
+						item_name: item_data.item_name || values.item_name,
+						uom: values.uom || item_data.stock_uom
 					});
+					dialog.hide();
 					this.save_and_refresh("bom");
 				};
-				if (values.raw_material) {
-					frappe.db.get_value("Item", values.raw_material, ["item_name", "stock_uom"]).then(r => add_row(r.message || {}));
-				} else {
-					add_row();
-				}
-			},
-			"Add BOM item",
-			"Add"
-		);
+
+				const existing_item = selected_item_code || values.item_name;
+				frappe.db.get_value("Item", existing_item, ["name", "item_name", "stock_uom"]).then(r => {
+					if (r.message && r.message.name) {
+						add_row(r.message, r.message.name);
+						return;
+					}
+					frappe.confirm(`Create Item "${values.item_name}"?`, () => {
+						frappe.call({
+							method: "apparel_erp.product_development.doctype.style.style.create_bom_item",
+							args: { item_name: values.item_name, item_type: values.item_type, uom: values.uom },
+							callback: (response) => add_row(response.message, response.message.name)
+						});
+					});
+				});
+			}
+		});
+
+		dialog.fields_dict.item_name.$input.on("change", () => {
+			const item_code = dialog.get_value("item_name");
+			selected_item_code = null;
+			if (!item_code) return;
+			frappe.db.get_value("Item", item_code, ["item_name", "stock_uom"]).then(r => {
+				if (!r.message) return;
+				selected_item_code = item_code;
+				dialog.set_value("uom", r.message.stock_uom || "");
+			});
+		});
+		dialog.show();
 	}
 
 	// ---------- Tech pack ----------

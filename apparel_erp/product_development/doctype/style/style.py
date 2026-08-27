@@ -47,23 +47,6 @@ class Style(Document):
 			seen.add(current)
 			current = frappe.db.get_value("Style", current, "base_style")
 
-
-def get_effective_bom_items(style_doc):
-	"""Use this Style's BOM, or walk up the Base Style chain when it has none."""
-	if style_doc.bom_items:
-		return style_doc.bom_items
-	seen = {style_doc.name}
-	current = style_doc.base_style
-	while current:
-		if current in seen:
-			frappe.throw(_("Base Style cycle detected while loading BOM materials."))
-		seen.add(current)
-		base_doc = frappe.get_doc("Style", current)
-		if base_doc.bom_items:
-			return base_doc.bom_items
-		current = base_doc.base_style
-	return []
-
 	def sync_matrix_rows(self):
 		"""Whenever Colours or Sizes change, make sure every Colour x Size
 		combination has a placeholder row in matrix_items. Existing rows
@@ -96,6 +79,22 @@ def get_effective_bom_items(style_doc):
 						"status": "Not Generated"
 					})
 
+
+def get_effective_bom_items(style_doc):
+	"""Use this Style's BOM, or walk up the Base Style chain when it has none."""
+	if style_doc.bom_items:
+		return style_doc.bom_items
+	seen = {style_doc.name}
+	current = style_doc.base_style
+	while current:
+		if current in seen:
+			frappe.throw(_("Base Style cycle detected while loading BOM materials."))
+		seen.add(current)
+		base_doc = frappe.get_doc("Style", current)
+		if base_doc.bom_items:
+			return base_doc.bom_items
+		current = base_doc.base_style
+	return []
 
 @frappe.whitelist()
 def set_development_stage(style, stage):
@@ -334,6 +333,28 @@ def _get_or_create_component_item(row):
 		comp.is_stock_item = 1
 		comp.insert(ignore_permissions=True)
 	return code
+
+
+@frappe.whitelist()
+def create_bom_item(item_name, item_type=None, uom=None):
+	"""Create the Item selected by the Style BOM dialog when it is new."""
+	item_name = (item_name or "").strip()
+	if not item_name:
+		frappe.throw(_("Enter an Item Name / Description."))
+
+	code = frappe.scrub(item_name).upper().replace(" ", "-")
+	if frappe.db.exists("Item", code):
+		item = frappe.get_doc("Item", code)
+	else:
+		item = frappe.new_doc("Item")
+		item.item_code = code
+		item.item_name = item_name
+		item.item_group = _get_or_create_item_group(item_type or "Raw Material")
+		item.stock_uom = uom or "Nos"
+		item.is_stock_item = 1
+		item.insert(ignore_permissions=True)
+
+	return {"name": item.name, "item_name": item.item_name, "stock_uom": item.stock_uom}
 
 
 def _create_bom_for_item(style_doc, item, bom_items=None):
