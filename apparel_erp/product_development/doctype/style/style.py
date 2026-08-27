@@ -335,6 +335,28 @@ def _get_or_create_component_item(row):
 	return code
 
 
+@frappe.whitelist()
+def create_bom_item(item_name, item_type=None, uom=None):
+	"""Create the Item selected by the Style BOM dialog when it is new."""
+	item_name = (item_name or "").strip()
+	if not item_name:
+		frappe.throw(_("Enter an Item Name / Description."))
+
+	code = frappe.scrub(item_name).upper().replace(" ", "-")
+	if frappe.db.exists("Item", code):
+		item = frappe.get_doc("Item", code)
+	else:
+		item = frappe.new_doc("Item")
+		item.item_code = code
+		item.item_name = item_name
+		item.item_group = _get_or_create_item_group(item_type or "Raw Material")
+		item.stock_uom = uom or "Nos"
+		item.is_stock_item = 1
+		item.insert(ignore_permissions=True)
+
+	return {"name": item.name, "item_name": item.item_name, "stock_uom": item.stock_uom}
+
+
 def _create_bom_for_item(style_doc, item, bom_items=None):
 	bom_items = bom_items if bom_items is not None else get_effective_bom_items(style_doc)
 	if not bom_items:
