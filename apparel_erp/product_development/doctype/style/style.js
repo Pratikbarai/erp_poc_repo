@@ -48,6 +48,33 @@ frappe.ui.form.on("Style", {
 		render_workflow(frm);
 	},
 
+	base_style(frm) {
+		if (!frm.doc.base_style) return;
+		frappe.call({
+			method: "apparel_erp.product_development.doctype.style.style.get_base_style_snapshot",
+			args: { base_style: frm.doc.base_style, current_style: frm.doc.name },
+			freeze: true,
+			freeze_message: __("Loading Base Style data...")
+		}).then((r) => {
+			if (!r.message) return;
+			const snapshot = r.message;
+			Object.entries(snapshot.fields || {}).forEach(([fieldname, value]) => {
+				if (value !== null && value !== undefined) frm.set_value(fieldname, value);
+			});
+			["colours", "sizes", "bom_items"].forEach((fieldname) => {
+				frm.clear_table(fieldname);
+				(snapshot[fieldname] || []).forEach(row => frm.add_child(fieldname, clean_child_row(row)));
+				frm.refresh_field(fieldname);
+			});
+			frm.dirty();
+			frappe.show_alert({
+				message: __("Base Style data loaded. You can edit the copied fields before saving."),
+				indicator: "green"
+			});
+			render_matrix(frm);
+		});
+	},
+
 	bom_template(frm) {
 		if (!frm.doc.bom_template || frm.is_new()) return;
 		frappe.call({
@@ -84,6 +111,16 @@ frappe.ui.form.on("Style", {
 		render_size_chart_preview(frm);
 	}
 });
+
+function clean_child_row(row) {
+	const cleaned = { ...row };
+	delete cleaned.name;
+	delete cleaned.parent;
+	delete cleaned.parentfield;
+	delete cleaned.parenttype;
+	delete cleaned.idx;
+	return cleaned;
+}
 
 function render_style_image_preview(frm) {
 	if (!frm.doc.style_image) return;

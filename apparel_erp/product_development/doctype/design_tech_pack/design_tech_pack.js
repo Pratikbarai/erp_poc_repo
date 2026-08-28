@@ -10,6 +10,7 @@ frappe.ui.form.on("Design Tech Pack", {
 		render_next_action(frm);
 		render_design_tech_pack_image_preview(frm);
 		render_callouts(frm);
+		add_measurement_upload_action(frm);
 	},
 
 	style(frm) {
@@ -347,7 +348,7 @@ function render_measurements(frm) {
 	$w.empty();
 
 	const sizes = (frm.tp_snapshot && frm.tp_snapshot.sizes) || [];
-	const upload_button = `<button class="btn btn-xs btn-default tp-upload-measurements">${__("Upload XLS/XLSX")}</button>`;
+	const upload_button = `<button class="btn btn-xs btn-default tp-upload-measurements">${__("Upload Excel/CSV")}</button>`;
 	if (!sizes.length) {
 		$w.html(`<div class="tp-measure-toolbar">${upload_button}</div><div class="text-muted">${__("Select Sizes on the Style first.")}</div>`);
 		bind_measurement_upload(frm, $w);
@@ -430,34 +431,44 @@ function render_measurements(frm) {
 
 function bind_measurement_upload(frm, $wrapper) {
 	$wrapper.find(".tp-upload-measurements").on("click", () => {
-		if (frm.is_new()) {
-			frappe.msgprint(__("Save the Design & Tech Pack before uploading measurements."));
-			return;
-		}
-		new frappe.ui.FileUploader({
-			doctype: "Design Tech Pack",
-			docname: frm.doc.name,
-			allow_multiple: false,
-			on_success: (file) => {
-				frappe.call({
-					method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.parse_measurements_sheet",
-					args: { name: frm.doc.name, file_url: file.file_url },
-					freeze: true,
-					freeze_message: __("Reading measurement sheet...")
-				}).then((r) => {
-					if (!r.message) return;
-					frm.clear_table("measurements");
-					r.message.forEach(row => frm.add_child("measurements", row));
-					frm.refresh_field("measurements");
-					frm.dirty();
-					render_measurements(frm);
-					frappe.show_alert({
-						message: __("Imported {0} measurement row(s). Save to apply.", [r.message.length]),
-						indicator: "green"
-					});
+		start_measurement_upload(frm);
+	});
+}
+
+function add_measurement_upload_action(frm) {
+	if (frm.is_new() || frm._measurement_upload_action_added) return;
+	frm.add_custom_button(__("Upload Measurements"), () => start_measurement_upload(frm));
+	frm._measurement_upload_action_added = true;
+}
+
+function start_measurement_upload(frm) {
+	if (frm.is_new()) {
+		frappe.msgprint(__("Save the Design & Tech Pack before uploading measurements."));
+		return;
+	}
+	new frappe.ui.FileUploader({
+		doctype: "Design Tech Pack",
+		docname: frm.doc.name,
+		allow_multiple: false,
+		on_success: (file) => {
+			frappe.call({
+				method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.parse_measurements_sheet",
+				args: { name: frm.doc.name, file_url: file.file_url },
+				freeze: true,
+				freeze_message: __("Reading measurement sheet...")
+			}).then((r) => {
+				if (!r.message) return;
+				frm.clear_table("measurements");
+				r.message.forEach(row => frm.add_child("measurements", row));
+				frm.refresh_field("measurements");
+				frm.dirty();
+				render_measurements(frm);
+				frappe.show_alert({
+					message: __("Imported {0} measurement row(s). Save to apply.", [r.message.length]),
+					indicator: "green"
 				});
-			}
-		});
+			});
+		}
 	});
 }
 

@@ -101,6 +101,46 @@ def get_effective_bom_items(style_doc):
 	return []
 
 
+@frappe.whitelist()
+def get_base_style_snapshot(base_style, current_style=None):
+	"""Return editable Style data for copying from an existing Base Style."""
+	if current_style and base_style == current_style:
+		frappe.throw(_("A Style cannot use itself as its Base Style."))
+
+	base_doc = frappe.get_doc("Style", base_style)
+	if not frappe.has_permission("Style", "read", doc=base_doc):
+		frappe.throw(_("Not permitted to read Base Style {0}").format(base_style))
+
+	return {
+		"fields": {
+			"company": base_doc.company,
+			"product_type": base_doc.product_type,
+			"category": base_doc.category,
+			"season": base_doc.season,
+			"launch_date": base_doc.launch_date,
+			"customer_brand": base_doc.customer_brand,
+			"designer": base_doc.designer,
+			"merchandiser": base_doc.merchandiser,
+			"department": base_doc.department,
+			"country_of_origin": base_doc.country_of_origin,
+			"description": base_doc.description,
+			"fit": base_doc.fit,
+			"sleeve": base_doc.sleeve,
+			"placket": base_doc.placket,
+			"collar": base_doc.collar,
+			"gender": base_doc.gender,
+			"fabric_type": base_doc.fabric_type,
+			"style_image": base_doc.style_image,
+			"size_chart": base_doc.size_chart,
+			"bom_template": base_doc.bom_template,
+			"bom_note": base_doc.bom_note
+		},
+		"colours": [row.as_dict() for row in base_doc.colours],
+		"sizes": [row.as_dict() for row in base_doc.sizes],
+		"bom_items": [row.as_dict() for row in base_doc.bom_items]
+	}
+
+
 def refresh_generated_boms(style_doc):
 	"""Create replacement BOMs after the Style BOM materials change."""
 	bom_items = get_effective_bom_items(style_doc)
@@ -127,7 +167,8 @@ def refresh_generated_boms(style_doc):
 		if old_bom_name:
 			old_bom = frappe.get_doc("BOM", old_bom_name)
 			if old_bom.docstatus == 1:
-				old_bom.cancel(ignore_permissions=True)
+				old_bom.flags.ignore_permissions = True
+				old_bom.cancel()
 			else:
 				old_bom.is_active = 0
 				old_bom.save(ignore_permissions=True)
