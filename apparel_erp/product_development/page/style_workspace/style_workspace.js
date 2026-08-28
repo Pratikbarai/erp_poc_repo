@@ -351,10 +351,10 @@ class StyleWorkspace {
 				const ccode = c.colour_code || c.colour_name;
 				matrix += `<tr><td class="sw-rowh">${c.swatch ? `<span class="sw-swatch" style="background:${c.swatch}"></span> ` : ""}${frappe.utils.escape_html(c.colour_name)}</td>`;
 				sizes.forEach(sz => {
-					const scode = sz.size_code || sz.size;
+						const scode = sz.size_code || ((s.matrix_items || []).find(m => m.size === sz.size)?.size_code) || sz.size;
 					const row = (s.matrix_items || []).find(m => m.colour_code === ccode && m.size_code === scode);
-					if (row && row.item) {
-							matrix += `<td><a href="#" class="sw-sku" data-item="${frappe.utils.escape_html(row.item)}">${frappe.utils.escape_html(row.sku || row.item)}</a><button class="sw-status sw-matrix-status" data-row="${frappe.utils.escape_html(row.name)}">${frappe.utils.escape_html(row.status || "Active")}</button></td>`;
+					if (row && (row.item || row.sku || row.bom)) {
+							matrix += `<td><a href="#" class="sw-sku ${row.item ? "" : "sw-sku-unlinked"}" data-item="${frappe.utils.escape_html(row.item || "")}">${frappe.utils.escape_html(row.sku || row.item || row.bom)}</a><button class="sw-status sw-matrix-status" data-row="${frappe.utils.escape_html(row.name)}">${frappe.utils.escape_html(row.status || "Active")}</button></td>`;
 					} else if (row) {
 							matrix += `<td><button class="sw-sku sw-sku-gen" data-colour="${frappe.utils.escape_html(ccode)}" data-size="${frappe.utils.escape_html(scode)}">+ Generate</button><span class="sw-status">${frappe.utils.escape_html(row.status || "Not Generated")}</span></td>`;
 					} else {

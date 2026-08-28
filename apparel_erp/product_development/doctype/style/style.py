@@ -37,7 +37,7 @@ class Style(Document):
 			self.development_stage = "Style Created"
 
 	def on_update(self):
-		if self.has_value_changed("bom_items"):
+		if self.has_value_changed("bom_items") or self.has_value_changed("bom_template"):
 			refresh_generated_boms(self)
 
 	def validate_base_style(self):

@@ -76,8 +76,8 @@ frappe.ui.form.on("Style", {
 	},
 
 	bom_template(frm) {
-		if (!frm.doc.bom_template || frm.is_new()) return;
-		frappe.call({
+		if (!frm.doc.bom_template) return;
+		const import_bom = () => frappe.call({
 			method: "apparel_erp.product_development.doctype.style.style.import_bom_to_style",
 			args: { style: frm.doc.name, bom: frm.doc.bom_template },
 			freeze: true,
@@ -90,6 +90,11 @@ frappe.ui.form.on("Style", {
 			});
 			frm.reload_doc().then(() => render_matrix(frm));
 		});
+		if (frm.is_new()) {
+			frm.save().then(import_bom);
+		} else {
+			import_bom();
+		}
 	},
 
 	// Table MultiSelect fires the fieldname event on add/remove, same as a normal field
@@ -210,12 +215,12 @@ function render_matrix(frm) {
 			);
 
 			html += `<td class="text-center apparel-matrix-cell" data-colour="${colour_code}" data-size="${size_code}">`;
-			if (matrix_row && matrix_row.item) {
+			if (matrix_row && (matrix_row.item || matrix_row.sku || matrix_row.bom)) {
 				const item_label = matrix_row.item_name
 					? `${matrix_row.item_name}${matrix_row.item_code ? ` (${matrix_row.item_code})` : ""}`
-					: matrix_row.item;
+					: matrix_row.sku || matrix_row.item || matrix_row.bom;
 				const item_status = matrix_row.status || "Active";
-				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${frappe.utils.escape_html(matrix_row.item)}">
+				html += `<a href="#" class="matrix-sku matrix-generated" data-item="${frappe.utils.escape_html(matrix_row.item || "")}">
 					${frappe.utils.escape_html(item_label)}</a>
 					<button type="button" class="btn btn-xs matrix-status-button" data-row="${frappe.utils.escape_html(matrix_row.name)}">${frappe.utils.escape_html(item_status)}</button>`;
 			} else if (matrix_row) {
