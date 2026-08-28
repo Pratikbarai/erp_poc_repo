@@ -196,6 +196,13 @@
       "description": "PDF or image shown via the Size Chart button, here and on the Design & Tech Pack."
     },
     {
+      "fieldname": "bom_template",
+      "fieldtype": "Link",
+      "label": "Existing BOM",
+      "options": "BOM",
+      "description": "Select an existing BOM to copy its materials into this Style BOM."
+    },
+    {
       "fieldname": "bom_items",
       "fieldtype": "Table",
       "label": "BOM Items",

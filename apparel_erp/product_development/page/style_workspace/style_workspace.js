@@ -522,7 +522,7 @@ class StyleWorkspace {
 		frappe.dom.freeze(is_bulk ? "Generating all pending SKUs…" : "Generating SKU & BOM…");
 		frappe.call({
 			method: "apparel_erp.product_development.doctype.style.style.generate_sku",
-			args: { style: this.style.name, colour_code, size_code },
+			args: { style: this.style.name, colour_code, size_code, generate_all: is_bulk ? 1 : 0 },
 			callback: (r) => {
 				frappe.dom.unfreeze();
 				if (r.message && r.message.item) {
@@ -612,7 +612,7 @@ class StyleWorkspace {
 				};
 
 				const existing_item = selected_item_code || values.item_name;
-				frappe.db.get_value("Item", existing_item, ["name", "item_name", "stock_uom"]).then(r => {
+				frappe.db.get_value("Item", existing_item, ["name", "item_name", "stock_uom", "description", "item_group"]).then(r => {
 					if (r.message && r.message.name) {
 						add_row(r.message, r.message.name);
 						return;
@@ -632,13 +632,23 @@ class StyleWorkspace {
 			const item_code = dialog.get_value("item_name");
 			selected_item_code = null;
 			if (!item_code) return;
-			frappe.db.get_value("Item", item_code, ["item_name", "stock_uom"]).then(r => {
+			frappe.db.get_value("Item", item_code, ["item_name", "stock_uom", "description", "item_group"]).then(r => {
 				if (!r.message) return;
 				selected_item_code = item_code;
+				dialog.set_value("item_name", r.message.item_name || item_code);
 				dialog.set_value("uom", r.message.stock_uom || "");
+				dialog.set_value("description", r.message.description || "");
+				dialog.set_value("item_type", this.get_bom_item_type(r.message.item_group));
 			});
 		});
 		dialog.show();
+	}
+
+	get_bom_item_type(item_group) {
+		const group = (item_group || "").toLowerCase();
+		if (group.includes("fabric")) return "Fabric";
+		if (group.includes("pack")) return "Packaging";
+		return "Trim";
 	}
 
 	// ---------- Tech pack ----------
@@ -749,6 +759,7 @@ class StyleWorkspace {
 							<div class="sw-callout-row" data-n="${c.sequence}">
 								<span class="sw-n">${c.sequence}</span><span>${frappe.utils.escape_html(c.text)}</span>
 								<button class="sw-btn sw-btn-sm sw-edit-callout" data-name="${frappe.utils.escape_html(c.name || "")}">Edit</button>
+								<button class="sw-btn sw-btn-sm sw-delete-callout" data-name="${frappe.utils.escape_html(c.name || "")}" title="Delete callout">Delete</button>
 							</div>`).join("") : `<div class="sw-empty" style="padding:8px">No callouts yet — add one from the sketch.</div>`}
 					</div>
 				</div>
@@ -807,6 +818,10 @@ class StyleWorkspace {
 
 		const $wrap = $panels.find("#swFlatWrap");
 		$panels.find("#swAddCallout").on("click", (e) => {
+			if (!$wrap.length) {
+				frappe.show_alert({ message: "Upload a front sketch before adding a callout.", indicator: "orange" });
+				return;
+			}
 			const adding = $wrap.toggleClass("adding").hasClass("adding");
 			$(e.currentTarget).text(adding ? "Click the sketch…" : "+ Add callout");
 		});
@@ -842,6 +857,16 @@ class StyleWorkspace {
 			const name = $(e.currentTarget).data("name");
 			const callout = this.tp.callouts.find(row => row.name === name);
 			if (callout) this.edit_callout(callout);
+		});
+		$panels.find(".sw-delete-callout").on("click", (e) => {
+			e.stopPropagation();
+			const name = $(e.currentTarget).data("name");
+			const callout = this.tp.callouts.find(row => row.name === name);
+			if (!callout) return;
+			frappe.confirm("Delete this callout?", () => {
+				this.tp.callouts = this.tp.callouts.filter(row => row !== callout);
+				this.save_techpack_and_refresh();
+			});
 		});
 	}
 

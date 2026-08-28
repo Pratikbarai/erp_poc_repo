@@ -18,6 +18,23 @@ frappe.ui.form.on("Design Tech Pack", {
 		}
 	},
 
+	bom_template(frm) {
+		if (!frm.doc.bom_template || !frm.doc.style) return;
+		frappe.call({
+			method: "apparel_erp.product_development.doctype.style.style.import_bom_to_style",
+			args: { style: frm.doc.style, bom: frm.doc.bom_template },
+			freeze: true,
+			freeze_message: __("Loading BOM materials...")
+		}).then((r) => {
+			if (!r.message) return;
+			frappe.show_alert({
+				message: __("Loaded {0} BOM material(s) into the linked Style.", [r.message.item_count]),
+				indicator: "green"
+			});
+			load_style_snapshot(frm);
+		});
+	},
+
 	status(frm) {
 		frm.dirty();
 	}
@@ -67,11 +84,13 @@ function load_style_snapshot(frm) {
 		callback: (r) => {
 			if (!r.message) return;
 			frm.tp_snapshot = r.message;
-			Object.entries(r.message.style_fields || {}).forEach(([fieldname, value]) => {
-				if (value == null || fieldname === "status" || fieldname === "tech_pack_version") return;
-				frm.doc[fieldname] = value;
-				frm.refresh_field(fieldname);
-			});
+			if (frm.is_new()) {
+				Object.entries(r.message.style_fields || {}).forEach(([fieldname, value]) => {
+					if (value == null || fieldname === "status" || fieldname === "tech_pack_version") return;
+					frm.doc[fieldname] = value;
+					frm.refresh_field(fieldname);
+				});
+			}
 			render_tp_header(frm);
 			render_colourways(frm, r.message.colours);
 			render_sizerange(frm, r.message.sizes);
@@ -328,8 +347,10 @@ function render_measurements(frm) {
 	$w.empty();
 
 	const sizes = (frm.tp_snapshot && frm.tp_snapshot.sizes) || [];
+	const upload_button = `<button class="btn btn-xs btn-default tp-upload-measurements">${__("Upload XLS/XLSX")}</button>`;
 	if (!sizes.length) {
-		$w.html(`<div class="text-muted">${__("Select Sizes on the Style first.")}</div>`);
+		$w.html(`<div class="tp-measure-toolbar">${upload_button}</div><div class="text-muted">${__("Select Sizes on the Style first.")}</div>`);
+		bind_measurement_upload(frm, $w);
 		return;
 	}
 
@@ -368,7 +389,7 @@ function render_measurements(frm) {
 	});
 
 	html += `</tbody></table></div>
-	<button class="btn btn-xs btn-default tp-add-point">${__("+ Add Measurement Point")}</button>
+	<div class="tp-measure-toolbar">${upload_button}<button class="btn btn-xs btn-default tp-add-point">${__("+ Add Measurement Point")}</button></div>
 	<style>.tp-measure-table input{width:70px;display:inline-block;}</style>`;
 
 	$w.html(html);
@@ -403,6 +424,40 @@ function render_measurements(frm) {
 			.filter(m => m.measurement_point === point)
 			.forEach(m => { m.tolerance = tolerance; });
 		frm.dirty();
+	});
+	bind_measurement_upload(frm, $w);
+}
+
+function bind_measurement_upload(frm, $wrapper) {
+	$wrapper.find(".tp-upload-measurements").on("click", () => {
+		if (frm.is_new()) {
+			frappe.msgprint(__("Save the Design & Tech Pack before uploading measurements."));
+			return;
+		}
+		new frappe.ui.FileUploader({
+			doctype: "Design Tech Pack",
+			docname: frm.doc.name,
+			allow_multiple: false,
+			on_success: (file) => {
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.parse_measurements_sheet",
+					args: { name: frm.doc.name, file_url: file.file_url },
+					freeze: true,
+					freeze_message: __("Reading measurement sheet...")
+				}).then((r) => {
+					if (!r.message) return;
+					frm.clear_table("measurements");
+					r.message.forEach(row => frm.add_child("measurements", row));
+					frm.refresh_field("measurements");
+					frm.dirty();
+					render_measurements(frm);
+					frappe.show_alert({
+						message: __("Imported {0} measurement row(s). Save to apply.", [r.message.length]),
+						indicator: "green"
+					});
+				});
+			}
+		});
 	});
 }
 

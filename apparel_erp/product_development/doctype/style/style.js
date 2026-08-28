@@ -37,10 +37,32 @@ frappe.ui.form.on("Style", {
 		}
 
 		render_style_image_preview(frm);
+		if (frm.is_new()) {
+			frm.add_custom_button(__("Select Existing Style"), () => {
+				frappe.set_route("List", "Style");
+			});
+		}
 	},
 
 	development_stage(frm) {
 		render_workflow(frm);
+	},
+
+	bom_template(frm) {
+		if (!frm.doc.bom_template || frm.is_new()) return;
+		frappe.call({
+			method: "apparel_erp.product_development.doctype.style.style.import_bom_to_style",
+			args: { style: frm.doc.name, bom: frm.doc.bom_template },
+			freeze: true,
+			freeze_message: __("Loading BOM materials...")
+		}).then((r) => {
+			if (!r.message) return;
+			frappe.show_alert({
+				message: __("Loaded {0} BOM material(s).", [r.message.item_count]),
+				indicator: "green"
+			});
+			frm.reload_doc().then(() => render_matrix(frm));
+		});
 	},
 
 	// Table MultiSelect fires the fieldname event on add/remove, same as a normal field
@@ -454,7 +476,8 @@ function generate_all_skus(frm) {
 				args: {
 					style: frm.doc.name,
 					colour_code: pending_rows[0].colour_code,
-					size_code: pending_rows[0].size_code
+					size_code: pending_rows[0].size_code,
+					generate_all: 1
 				},
 				callback: function (r) {
 					frappe.dom.unfreeze();

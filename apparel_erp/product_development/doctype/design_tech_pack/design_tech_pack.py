@@ -109,13 +109,108 @@ def get_style_snapshot(style):
 			"style_image": style_doc.style_image,
 			"size_chart": style_doc.size_chart,
 			"current_stage": style_doc.development_stage,
-			"created_on": style_doc.creation
+			"created_on": style_doc.creation,
+			"bom_template": style_doc.bom_template
 		},
 		"colours": colours,
 		"sizes": sizes,
 		"bom_items": bom_items,
 		"matrix_items": matrix_items
 	}
+
+
+@frappe.whitelist()
+def parse_measurements_sheet(name, file_url):
+	"""Parse an uploaded XLS/XLSX measurement sheet into child-table rows."""
+	doc = frappe.get_doc("Design Tech Pack", name)
+	if not frappe.has_permission("Design Tech Pack", "write", doc=doc):
+		frappe.throw(_("Not permitted to update Design Tech Pack {0}").format(name))
+
+	file_doc = frappe.get_doc("File", {"file_url": file_url})
+	if file_doc.attached_to_doctype != "Design Tech Pack" or file_doc.attached_to_name != name:
+		frappe.throw(_("The measurement file must be attached to this Design Tech Pack."))
+	if not (file_doc.file_name or "").lower().endswith((".xls", ".xlsx")):
+		frappe.throw(_("Upload an XLS or XLSX file."))
+
+	from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+
+	rows = read_xlsx_file_from_attached_file(
+		fcontent=file_doc.get_content(), filename=file_doc.file_name
+	)
+	rows = [[str(cell).strip() if cell is not None else "" for cell in row] for row in rows]
+	rows = [row for row in rows if any(row)]
+	if len(rows) < 2:
+		frappe.throw(_("The measurement sheet must contain a header and at least one data row."))
+
+	headers = [_normalise_sheet_header(value) for value in rows[0]]
+	point_index = _find_header_index(headers, ("measurement point", "measurement_point", "point"))
+	if point_index is None:
+		point_index = 0
+
+	long_size_index = _find_header_index(headers, ("size", "size code", "size_code"))
+	value_index = _find_header_index(headers, ("value", "measurement", "measurement value"))
+	tolerance_index = _find_header_index(headers, ("tolerance", "tol", "tol (+/-)"))
+	parsed = []
+
+	if long_size_index is not None and value_index is not None:
+		for sequence, row in enumerate(rows[1:], 1):
+			point = _sheet_cell(row, point_index)
+			size = _sheet_cell(row, long_size_index)
+			if not point or not size:
+				continue
+			parsed.append({
+				"measurement_point": point,
+				"size": size,
+				"value": _sheet_number(_sheet_cell(row, value_index)),
+				"tolerance": _sheet_number(_sheet_cell(row, tolerance_index)) if tolerance_index is not None else None,
+				"sequence": sequence
+			})
+	else:
+		size_indexes = [
+			(index, header) for index, header in enumerate(headers)
+			if index != point_index and header and index != tolerance_index
+		]
+		for sequence, row in enumerate(rows[1:], 1):
+			point = _sheet_cell(row, point_index)
+			if not point:
+				continue
+			tolerance = _sheet_number(_sheet_cell(row, tolerance_index)) if tolerance_index is not None else None
+			for size_index, size in size_indexes:
+				value = _sheet_number(_sheet_cell(row, size_index))
+				if value is None:
+					continue
+				parsed.append({
+					"measurement_point": point,
+					"size": size,
+					"value": value,
+					"tolerance": tolerance,
+					"sequence": sequence
+				})
+
+	if not parsed:
+		frappe.throw(_("No measurement values were found in the sheet."))
+	return parsed
+
+
+def _normalise_sheet_header(value):
+	return " ".join(str(value or "").lower().replace("_", " ").split())
+
+
+def _find_header_index(headers, names):
+	return next((index for index, header in enumerate(headers) if header in names), None)
+
+
+def _sheet_cell(row, index):
+	return row[index] if index is not None and index < len(row) else ""
+
+
+def _sheet_number(value):
+	if value in (None, ""):
+		return None
+	try:
+		return float(str(value).replace(",", "").strip())
+	except (TypeError, ValueError):
+		frappe.throw(_("Measurement values must be numeric: {0}").format(value))
 
 
 @frappe.whitelist()

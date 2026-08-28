@@ -38,44 +38,38 @@
       "fieldtype": "Data",
       "label": "Style No.",
       "fetch_from": "style.style_no",
-      "read_only": 1,
       "in_list_view": 1
     },
     {
       "fieldname": "style_name",
       "fieldtype": "Data",
       "label": "Style Name",
-      "fetch_from": "style.style_name",
-      "read_only": 1
+      "fetch_from": "style.style_name"
     },
     {
       "fieldname": "product_type",
       "fieldtype": "Data",
       "label": "Product Type",
-      "fetch_from": "style.product_type",
-      "read_only": 1
+      "fetch_from": "style.product_type"
     },
     {
       "fieldname": "company",
       "fieldtype": "Link",
       "label": "Company",
       "fetch_from": "style.company",
-      "read_only": 1,
       "options": "Company"
     },
     {
       "fieldname": "category",
       "fieldtype": "Data",
       "label": "Category",
-      "fetch_from": "style.category",
-      "read_only": 1
+      "fetch_from": "style.category"
     },
     {
       "fieldname": "season",
       "fieldtype": "Data",
       "label": "Season",
-      "fetch_from": "style.season",
-      "read_only": 1
+      "fetch_from": "style.season"
     },
     {
       "fieldname": "col_h2",
@@ -85,36 +79,31 @@
       "fieldname": "customer_brand",
       "fieldtype": "Data",
       "label": "Customer / Brand",
-      "fetch_from": "style.customer_brand",
-      "read_only": 1
+      "fetch_from": "style.customer_brand"
     },
     {
       "fieldname": "designer",
       "fieldtype": "Data",
       "label": "Designer",
-      "fetch_from": "style.designer",
-      "read_only": 1
+      "fetch_from": "style.designer"
     },
     {
       "fieldname": "merchandiser",
       "fieldtype": "Data",
       "label": "Merchandiser",
-      "fetch_from": "style.merchandiser",
-      "read_only": 1
+      "fetch_from": "style.merchandiser"
     },
     {
       "fieldname": "department",
       "fieldtype": "Data",
       "label": "Department",
-      "fetch_from": "style.department",
-      "read_only": 1
+      "fetch_from": "style.department"
     },
     {
       "fieldname": "country_of_origin",
       "fieldtype": "Data",
       "label": "Country of Origin",
-      "fetch_from": "style.country_of_origin",
-      "read_only": 1
+      "fetch_from": "style.country_of_origin"
     },
     {
       "fieldname": "created_on",
@@ -172,8 +161,7 @@
       "fieldname": "style_image",
       "fieldtype": "Attach Image",
       "label": "Style Image",
-      "fetch_from": "style.style_image",
-      "read_only": 1
+      "fetch_from": "style.style_image"
     },
     {
       "fieldname": "tab_design_tech_pack",
@@ -193,8 +181,7 @@
       "fieldname": "description",
       "fieldtype": "Small Text",
       "label": "Description",
-      "fetch_from": "style.description",
-      "read_only": 1
+      "fetch_from": "style.description"
     },
     {
       "fieldname": "col_ka2",
@@ -204,22 +191,19 @@
       "fieldname": "fit",
       "fieldtype": "Data",
       "label": "Fit",
-      "fetch_from": "style.fit",
-      "read_only": 1
+      "fetch_from": "style.fit"
     },
     {
       "fieldname": "sleeve",
       "fieldtype": "Data",
       "label": "Sleeve",
-      "fetch_from": "style.sleeve",
-      "read_only": 1
+      "fetch_from": "style.sleeve"
     },
     {
       "fieldname": "placket",
       "fieldtype": "Data",
       "label": "Placket",
-      "fetch_from": "style.placket",
-      "read_only": 1
+      "fetch_from": "style.placket"
     },
     {
       "fieldname": "col_ka3",
@@ -229,22 +213,19 @@
       "fieldname": "collar",
       "fieldtype": "Data",
       "label": "Collar",
-      "fetch_from": "style.collar",
-      "read_only": 1
+      "fetch_from": "style.collar"
     },
     {
       "fieldname": "gender",
       "fieldtype": "Data",
       "label": "Gender",
-      "fetch_from": "style.gender",
-      "read_only": 1
+      "fetch_from": "style.gender"
     },
     {
       "fieldname": "fabric_type_field",
       "fieldtype": "Data",
       "label": "Fabric Type",
-      "fetch_from": "style.fabric_type",
-      "read_only": 1
+      "fetch_from": "style.fabric_type"
     },
     {
       "fieldname": "sb_sketch",
@@ -311,7 +292,6 @@
       "fieldtype": "Attach",
       "label": "Size Chart",
       "fetch_from": "style.size_chart",
-      "read_only": 1,
       "hidden": 1
     },
     {
@@ -395,6 +375,13 @@
       "description": "Read-only, pulled from the Style's BOM table - add/edit lines on the Style's BOM tab."
     },
     {
+      "fieldname": "bom_template",
+      "fieldtype": "Link",
+      "label": "Existing BOM",
+      "options": "BOM",
+      "description": "Select an existing BOM to copy its materials into the linked Style."
+    },
+    {
       "fieldname": "sb_ref_images",
       "fieldtype": "Section Break",
       "label": "7. Reference Images"
@@ -461,7 +448,7 @@
     {
       "fieldname": "bom_placeholder_html",
       "fieldtype": "HTML",
-      "options": "BOM management will be available here."
+      "options": "Select an existing BOM above to load its materials into the linked Style."
     },
     {
       "fieldname": "tab_samples",
