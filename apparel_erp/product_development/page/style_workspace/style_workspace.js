@@ -510,8 +510,7 @@ class StyleWorkspace {
 			callback: (r) => {
 				frappe.dom.unfreeze();
 				sw_toast(this.wrapper, "Saved.");
-				this.style = r.message;
-				this.render_style();
+				this.load_style(this.style.name);
 				if (tab) setTimeout(() => this.switch_tab(tab), 50);
 			},
 			error: () => frappe.dom.unfreeze()
@@ -725,7 +724,9 @@ class StyleWorkspace {
 
 		const refImages = tp.reference_images || [];
 		const attachments = tp.attachments || [];
-		const callouts = (tp.callouts || []).filter(c => (c.sketch || "Front") === "Front");
+		const callouts = tp.callouts || [];
+		const frontCallouts = callouts.filter(c => (c.sketch || "Front") === "Front");
+		const backCallouts = callouts.filter(c => c.sketch === "Back");
 
 		$panels.html(`
 			<div class="sw-card">
@@ -743,13 +744,12 @@ class StyleWorkspace {
 			</div>
 			<div class="sw-grid2" style="grid-template-columns:1.1fr 1fr">
 				<div class="sw-card">
-					<div class="sw-card-h"><h2>Front sketch &amp; callouts</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddCallout">+ Add callout</button></div></div>
+					<div class="sw-card-h"><h2>Front sketch &amp; callouts</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swAddCalloutFront">+ Add callout</button></div></div>
 					<div class="sw-card-b">
 						${tp.front_sketch
-							? `<div class="sw-flat-wrap" id="swFlatWrap"><img src="${tp.front_sketch}" draggable="false">${callouts.map(c => `<button class="sw-pin" style="left:${c.x}%;top:${c.y}%" data-n="${c.sequence}">${c.sequence}</button>`).join("")}</div>
-							   <div class="sw-note" style="margin-top:8px">Click "+ Add callout" then click anywhere on the sketch to drop a numbered pin. Back sketch is shown below without pins for now.</div>`
+								? `<div class="sw-flat-wrap" id="swFrontWrap"><img src="${tp.front_sketch}" draggable="false">${frontCallouts.map(c => `<button class="sw-pin" style="left:${c.x}%;top:${c.y}%" data-n="${c.sequence}">${c.sequence}</button>`).join("")}</div>`
 							: `<div class="sw-empty">No front sketch uploaded — upload one on the full tech pack form first.</div>`}
-						${tp.back_sketch ? `<img src="${tp.back_sketch}" style="max-width:100%;margin-top:12px;border-radius:6px;border:1px solid var(--sw-line)">` : ""}
+							${tp.back_sketch ? `<div class="sw-sketch-block"><div class="sw-sketch-label">Back sketch <button class="sw-btn sw-btn-sm" id="swAddCalloutBack">+ Add callout</button></div><div class="sw-flat-wrap" id="swBackWrap"><img src="${tp.back_sketch}" draggable="false">${backCallouts.map(c => `<button class="sw-pin" style="left:${c.x}%;top:${c.y}%" data-n="${c.sequence}">${c.sequence}</button>`).join("")}</div></div>` : ""}
 					</div>
 				</div>
 				<div class="sw-card">
@@ -818,33 +818,38 @@ class StyleWorkspace {
 		});
 		$panels.find("#swAddReferenceImage").on("click", () => this.add_reference_image());
 
-		const $wrap = $panels.find("#swFlatWrap");
-		$panels.find("#swAddCallout").on("click", (e) => {
-			if (!$wrap.length) {
-				frappe.show_alert({ message: "Upload a front sketch before adding a callout.", indicator: "orange" });
-				return;
-			}
-			const adding = $wrap.toggleClass("adding").hasClass("adding");
-			$(e.currentTarget).text(adding ? "Click the sketch…" : "+ Add callout");
-		});
-		$wrap.on("click", (e) => {
-			if (!$wrap.hasClass("adding") || $(e.target).hasClass("sw-pin")) return;
-			const rect = $wrap[0].getBoundingClientRect();
-			const x = ((e.clientX - rect.left) / rect.width) * 100;
-			const y = ((e.clientY - rect.top) / rect.height) * 100;
-			frappe.prompt(
-				[{ fieldname: "text", label: "Construction note", fieldtype: "Data", reqd: 1 }],
-				(values) => {
-					this.tp.callouts = this.tp.callouts || [];
-					const next_n = this.tp.callouts.filter(c => (c.sketch || "Front") === "Front").length + 1;
-					this.tp.callouts.push({ sequence: next_n, text: values.text, sketch: "Front", x: x.toFixed(2), y: y.toFixed(2) });
-					this.save_techpack_and_refresh();
-				},
-				"Add callout",
-				"Add"
-			);
-			$wrap.removeClass("adding");
-			$panels.find("#swAddCallout").text("+ Add callout");
+		[
+			{ wrapper: "#swFrontWrap", button: "#swAddCalloutFront", sketch: "Front" },
+			{ wrapper: "#swBackWrap", button: "#swAddCalloutBack", sketch: "Back" }
+		].forEach(({ wrapper, button, sketch }) => {
+			const $wrap = $panels.find(wrapper);
+			$panels.find(button).on("click", (e) => {
+				if (!$wrap.length) {
+					frappe.show_alert({ message: `Upload a ${sketch.toLowerCase()} sketch before adding a callout.`, indicator: "orange" });
+					return;
+				}
+				const adding = $wrap.toggleClass("adding").hasClass("adding");
+				$(e.currentTarget).text(adding ? "Click the sketch…" : "+ Add callout");
+			});
+			$wrap.on("click", (e) => {
+				if (!$wrap.hasClass("adding") || $(e.target).hasClass("sw-pin")) return;
+				const rect = $wrap[0].getBoundingClientRect();
+				const x = ((e.clientX - rect.left) / rect.width) * 100;
+				const y = ((e.clientY - rect.top) / rect.height) * 100;
+				frappe.prompt(
+					[{ fieldname: "text", label: "Construction note", fieldtype: "Data", reqd: 1 }],
+					(values) => {
+						this.tp.callouts = this.tp.callouts || [];
+						const next_n = this.tp.callouts.reduce((max, row) => Math.max(max, row.sequence || 0), 0) + 1;
+						this.tp.callouts.push({ sequence: next_n, text: values.text, sketch, x: x.toFixed(2), y: y.toFixed(2) });
+						this.save_techpack_and_refresh();
+					},
+					"Add callout",
+					"Add"
+				);
+				$wrap.removeClass("adding");
+				$panels.find(button).text("+ Add callout");
+			});
 		});
 		const select_callout = (n) => {
 			$panels.find(".sw-pin").toggleClass("on", false);
