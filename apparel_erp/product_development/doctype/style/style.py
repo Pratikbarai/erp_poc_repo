@@ -13,6 +13,10 @@ WORKFLOW_STAGES = [
 
 STYLE_STATUSES = ("Not Started", "In Progress", "Completed")
 MATRIX_ITEM_STATUSES = ("Active", "Drop", "On Hold")
+BOM_ITEM_FIELDS = (
+	"item_type", "item_name", "raw_material", "new_item_code", "uom", "base_qty",
+	"tolerance", "description", "composition", "gsm", "consumption"
+)
 
 
 class Style(Document):
@@ -23,7 +27,7 @@ class Style(Document):
 		previous = self.get_doc_before_save()
 		if not previous:
 			self.bom_version = "1.0"
-		elif self.has_value_changed("bom_items"):
+		elif _bom_items_changed(self, previous):
 			self.bom_version = _next_version(previous.bom_version or "1.0")
 		else:
 			self.bom_version = previous.bom_version or "1.0"
@@ -37,7 +41,8 @@ class Style(Document):
 			self.development_stage = "Style Created"
 
 	def on_update(self):
-		if self.has_value_changed("bom_items") or self.has_value_changed("bom_template"):
+		previous = self.get_doc_before_save()
+		if _bom_items_changed(self, previous) or self.has_value_changed("bom_template"):
 			refresh_generated_boms(self)
 
 	def validate_base_style(self):
@@ -82,6 +87,17 @@ class Style(Document):
 						"size_code": size_doc_code,
 						"status": "Not Generated"
 					})
+
+
+def _bom_items_changed(style_doc, previous):
+	if previous is None:
+		return bool(style_doc.bom_items)
+
+	return _bom_item_signature(style_doc.bom_items) != _bom_item_signature(previous.bom_items)
+
+
+def _bom_item_signature(rows):
+	return [tuple(row.get(field) for field in BOM_ITEM_FIELDS) for row in rows]
 
 
 def get_effective_bom_items(style_doc):
@@ -228,11 +244,14 @@ def generate_sku(style, colour_code, size_code, generate_all=False):
 	sku = f"{style_doc.style_no}-{colour_code}-{size_code}"
 	colour_row = next((c for c in style_doc.colours if c.colour_code == colour_code or c.colour_name == colour_code), None)
 
-	item = _get_or_create_style_item(
-		style_doc,
-		item_code=sku,
-		item_name=f"{style_doc.style_name} - {colour_row.colour_name if colour_row else colour_code} - {size_code}",
-	)
+	if target_row.item and frappe.db.exists("Item", target_row.item):
+		item = frappe.get_doc("Item", target_row.item)
+	else:
+		item = _get_or_create_style_item(
+			style_doc,
+			item_code=sku,
+			item_name=f"{style_doc.style_name} - {colour_row.colour_name if colour_row else colour_code} - {size_code}",
+		)
 
 	bom_name = _create_bom_for_item(style_doc, item, bom_items)
 
