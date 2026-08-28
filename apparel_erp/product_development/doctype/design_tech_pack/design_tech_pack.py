@@ -139,8 +139,11 @@ def parse_measurements_sheet(name, file_url):
 		rows = list(csv.reader(StringIO(content)))
 	elif filename.endswith((".xls", ".xlsx")):
 		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+		content = file_doc.get_content(encodings=[])
+		if isinstance(content, str):
+			content = content.encode("latin-1")
 		rows = read_xlsx_file_from_attached_file(
-			fcontent=file_doc.get_content(), filepath=file_doc.file_name
+			fcontent=content, filepath=file_doc.file_name
 		)
 	else:
 		frappe.throw(_("Upload an Excel (.xls/.xlsx) or CSV file."))
