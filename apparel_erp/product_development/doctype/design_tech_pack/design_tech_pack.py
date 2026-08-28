@@ -140,7 +140,7 @@ def parse_measurements_sheet(name, file_url):
 	elif filename.endswith((".xls", ".xlsx")):
 		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
 		rows = read_xlsx_file_from_attached_file(
-			fcontent=file_doc.get_content(), filename=file_doc.file_name
+			fcontent=file_doc.get_content(), filepath=file_doc.file_name
 		)
 	else:
 		frappe.throw(_("Upload an Excel (.xls/.xlsx) or CSV file."))
