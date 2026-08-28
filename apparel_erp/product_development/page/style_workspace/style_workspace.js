@@ -775,7 +775,7 @@ class StyleWorkspace {
 				</div>
 			</div>
 			<div class="sw-card">
-				<div class="sw-card-h"><h2>Measurements — points of measure</h2></div>
+				<div class="sw-card-h"><h2>Measurements — points of measure</h2><div class="sw-right"><button class="sw-btn sw-btn-sm" id="swUploadMeasurements">Upload Excel/CSV</button><button class="sw-btn sw-btn-sm" id="swOpenTPMeasurements">Manual entry</button></div></div>
 				${pom}
 			</div>
 			<div class="sw-grid2">
@@ -805,6 +805,8 @@ class StyleWorkspace {
 		`);
 		this.tp = tp;
 		$panels.find("#swOpenTPForm").on("click", () => frappe.set_route("Form", "Design Tech Pack", tp.name));
+		$panels.find("#swOpenTPMeasurements").on("click", () => frappe.set_route("Form", "Design Tech Pack", tp.name));
+		$panels.find("#swUploadMeasurements").on("click", () => this.upload_measurements());
 		$panels.find("#swTechPackVersion").on("click", () => this.show_version_history(
 			"Tech Pack Version History",
 			"apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.get_version_history",
@@ -904,6 +906,39 @@ class StyleWorkspace {
 			"Add reference image",
 			"Upload"
 		);
+	}
+
+	upload_measurements() {
+		new frappe.ui.FileUploader({
+			doctype: "Design Tech Pack",
+			docname: this.tp.name,
+			allow_multiple: false,
+			on_success: (file) => {
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.parse_measurements_sheet",
+					args: { name: this.tp.name, file_url: file.file_url },
+					freeze: true,
+					freeze_message: "Reading measurement sheet..."
+				}).then((parsed) => {
+					if (!parsed.message) return;
+					this.tp.measurements = parsed.message;
+					frappe.call({
+						method: "frappe.client.save",
+						args: { doc: this.tp },
+						freeze: true,
+						freeze_message: "Saving measurements..."
+					}).then((saved) => {
+						this.tp = saved.message;
+						const $panels = $(this.wrapper).find("#swPanels");
+						this.tpl_techpack($panels, this.tp, this.style);
+						frappe.show_alert({
+							message: `Imported ${parsed.message.length} measurement row(s).`,
+							indicator: "green"
+						});
+					});
+				});
+			}
+		});
 	}
 
 	show_version_history(title, method, args) {

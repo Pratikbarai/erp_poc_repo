@@ -129,14 +129,21 @@ def parse_measurements_sheet(name, file_url):
 	file_doc = frappe.get_doc("File", {"file_url": file_url})
 	if file_doc.attached_to_doctype != "Design Tech Pack" or file_doc.attached_to_name != name:
 		frappe.throw(_("The measurement file must be attached to this Design Tech Pack."))
-	if not (file_doc.file_name or "").lower().endswith((".xls", ".xlsx")):
-		frappe.throw(_("Upload an XLS or XLSX file."))
-
-	from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
-
-	rows = read_xlsx_file_from_attached_file(
-		fcontent=file_doc.get_content(), filename=file_doc.file_name
-	)
+	filename = (file_doc.file_name or "").lower()
+	if filename.endswith(".csv"):
+		import csv
+		from io import StringIO
+		content = file_doc.get_content()
+		if isinstance(content, bytes):
+			content = content.decode("utf-8-sig")
+		rows = list(csv.reader(StringIO(content)))
+	elif filename.endswith((".xls", ".xlsx")):
+		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+		rows = read_xlsx_file_from_attached_file(
+			fcontent=file_doc.get_content(), filename=file_doc.file_name
+		)
+	else:
+		frappe.throw(_("Upload an Excel (.xls/.xlsx) or CSV file."))
 	rows = [[str(cell).strip() if cell is not None else "" for cell in row] for row in rows]
 	rows = [row for row in rows if any(row)]
 	if len(rows) < 2:
