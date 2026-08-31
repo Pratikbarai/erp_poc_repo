@@ -138,19 +138,31 @@ def parse_measurements_sheet(name, file_url):
 			content = content.decode("utf-8-sig")
 		rows = list(csv.reader(StringIO(content)))
 	elif filename.endswith((".xls", ".xlsx")):
-		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
 		content = file_doc.get_content(encodings=[])
 		if isinstance(content, str):
 			content = content.encode("latin-1")
-		rows = read_xlsx_file_from_attached_file(
-			fcontent=content, filepath=file_doc.file_name
-		)
+		if filename.endswith(".xls"):
+			from frappe.utils.xlsxutils import read_xls_file_from_attached_file
+			rows = read_xls_file_from_attached_file(content)
+		else:
+			from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+			rows = read_xlsx_file_from_attached_file(
+				fcontent=content, filepath=file_doc.file_name
+			)
 	else:
 		frappe.throw(_("Upload an Excel (.xls/.xlsx) or CSV file."))
 	rows = [[str(cell).strip() if cell is not None else "" for cell in row] for row in rows]
 	rows = [row for row in rows if any(row)]
 	if len(rows) < 2:
 		frappe.throw(_("The measurement sheet must contain a header and at least one data row."))
+
+	style_doc = frappe.get_doc("Style", doc.style)
+	selected_sizes = {}
+	for style_size in style_doc.sizes:
+		size_code = frappe.db.get_value("Size", style_size.size, "size_code") or style_size.size
+		for size_value in (style_size.size, size_code):
+			if size_value:
+				selected_sizes[_normalise_sheet_header(size_value)] = style_size.size
 
 	headers = [_normalise_sheet_header(value) for value in rows[0]]
 	point_index = _find_header_index(headers, ("measurement point", "measurement_point", "point"))
@@ -177,9 +189,11 @@ def parse_measurements_sheet(name, file_url):
 			})
 	else:
 		size_indexes = [
-			(index, header) for index, header in enumerate(headers)
+			(index, selected_sizes.get(header)) for index, header in enumerate(headers)
 			if index != point_index and header and index != tolerance_index
 		]
+		if any(size is None for _, size in size_indexes):
+			frappe.throw(_("Every measurement size column must be selected on the Style."))
 		for sequence, row in enumerate(rows[1:], 1):
 			point = _sheet_cell(row, point_index)
 			if not point:
