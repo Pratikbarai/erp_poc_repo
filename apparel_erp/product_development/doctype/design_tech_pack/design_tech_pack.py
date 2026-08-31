@@ -47,7 +47,8 @@ def get_style_snapshot(style):
 			"colour_name": c.colour_name,
 			"colour_code": c.colour_code,
 			"swatch": c.swatch,
-			"status": c.status
+			"status": c.status,
+			"approved_for_production": c.get("approved_for_production") or 0
 		}
 		for c in style_doc.colours
 	]
@@ -67,7 +68,8 @@ def get_style_snapshot(style):
 			"consumption": b.consumption,
 			"uom": b.uom,
 			"base_qty": b.base_qty,
-			"tolerance": b.tolerance
+			"tolerance": b.tolerance,
+			"available_in_market": b.get("available_in_market") if hasattr(b, "get") else (b.available_in_market if hasattr(b, "available_in_market") else 1)
 		}
 		for b in get_effective_bom_items(style_doc)
 	]
@@ -81,7 +83,8 @@ def get_style_snapshot(style):
 			"sku": row.sku,
 			"item": row.item,
 			"bom": row.bom,
-			"status": row.status or "Not Generated"
+			"status": row.status or "Not Generated",
+			"production_for_sku": row.get("production_for_sku") or 1
 		}
 		for row in style_doc.matrix_items
 	]

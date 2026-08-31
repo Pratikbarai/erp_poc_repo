@@ -97,6 +97,7 @@ function load_style_snapshot(frm) {
 			render_sizerange(frm, r.message.sizes);
 			render_matrix_status(frm, r.message.matrix_items);
 			render_fabric_trims(frm, r.message.bom_items);
+			render_production(frm, r.message);
 			render_measurements(frm);
 		},
 		error: (r) => {
@@ -341,6 +342,53 @@ function bind_edit_bom(frm, $wrapper) {
 			if (workspace && workspace.style_workspace) workspace.style_workspace.switch_tab("bom");
 		}, 300);
 	});
+}
+
+function render_production(frm, snapshot) {
+	const $w = frm.get_field("production_placeholder_html").$wrapper;
+	$w.empty();
+
+	const colours = snapshot && snapshot.colours ? snapshot.colours : [];
+	const bom_items = snapshot && snapshot.bom_items ? snapshot.bom_items : [];
+	const matrix_items = snapshot && snapshot.matrix_items ? snapshot.matrix_items : [];
+	const approved_colours = colours.filter(c => c.approved_for_production);
+	const available_materials = bom_items.filter(b => b.available_in_market !== 0 && b.available_in_market !== false);
+	const selected_for_production = matrix_items.filter(row => row.production_for_sku !== 0 && row.production_for_sku !== false);
+	const generated_skus = matrix_items.filter(row => row.status === "Active" || row.item || row.bom).length;
+	const total_possible = Math.max(0, approved_colours.length * Math.max(1, (frm.tp_snapshot && frm.tp_snapshot.sizes ? frm.tp_snapshot.sizes.length : 0)));
+
+	const html = `
+		<div class="tp-production-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;">
+			<div class="tp-production-card">
+				<div class="tp-production-label">Approved Colours</div>
+				<div class="tp-production-value ${approved_colours.length ? "ok" : "warn"}">${approved_colours.length} / ${colours.length || 0}</div>
+			</div>
+			<div class="tp-production-card">
+				<div class="tp-production-label">Available Materials</div>
+				<div class="tp-production-value ${available_materials.length === bom_items.length ? "ok" : "warn"}">${available_materials.length} / ${bom_items.length || 0}</div>
+			</div>
+			<div class="tp-production-card">
+				<div class="tp-production-label">Selected for Production</div>
+				<div class="tp-production-value">${selected_for_production.length}</div>
+			</div>
+			<div class="tp-production-card">
+				<div class="tp-production-label">Generated SKUs</div>
+				<div class="tp-production-value">${generated_skus}</div>
+			</div>
+		</div>
+		<div style="margin-top:12px; font-size:12px; color:var(--text-muted);">
+			${total_possible ? `Possible variants: ${total_possible}` : "No approved colour/size combinations are ready yet."}
+		</div>
+		<style>
+			.tp-production-card{border:1px solid var(--border-color); border-radius:8px; padding:12px; background:#fafafa;}
+			.tp-production-label{font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); margin-bottom:6px;}
+			.tp-production-value{font-size:24px; font-weight:700; color:var(--primary);}
+			.tp-production-value.ok{color:#2e8b57;}
+			.tp-production-value.warn{color:#d97706;}
+		</style>
+	`;
+
+	$w.html(html);
 }
 
 function render_measurements(frm) {
