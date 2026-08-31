@@ -57,9 +57,10 @@ class Style(Document):
 			current = frappe.db.get_value("Style", current, "base_style")
 
 	def sync_matrix_rows(self):
-		"""Whenever Colours or Sizes change, make sure every Colour x Size
+		"""Whenever Colours or Sizes change, make sure every approved Colour x Size
 		combination has a placeholder row in matrix_items. Existing rows
-		(already generated SKUs) are never removed automatically."""
+		(already generated SKUs) are never removed automatically.
+		Only creates matrix items for colours approved for production."""
 		existing_keys = {
 			(row.colour_code, row.size_code): row for row in self.matrix_items
 		}
@@ -72,9 +73,13 @@ class Style(Document):
 					row.item_name = item_data.item_name
 					row.item_code = item_data.item_code
 
-		active_colours = [c for c in self.colours if (c.status or "Active") == "Active"]
+		# Only include colours that are: Active AND Approved for Production
+		approved_colours = [
+			c for c in self.colours 
+			if (c.status or "Active") == "Active" and (c.get("approved_for_production") or 0)
+		]
 
-		for colour in active_colours:
+		for colour in approved_colours:
 			colour_code = colour.colour_code or colour.colour_name
 			for size_row in self.sizes:
 				size_doc_code = frappe.db.get_value("Size", size_row.size, "size_code") or size_row.size
@@ -221,7 +226,7 @@ def generate_sku(style, colour_code, size_code, generate_all=False):
 	Creates the Item (SKU) + a base BOM from the style's BOM table if they
 	don't already exist, links them on the matrix row, and returns the
 	Item name so the client can redirect to it. When `generate_all` is true,
-	it also generates every pending SKU + BOM."""
+	it also generates every pending SKU + BOM marked for production."""
 
 	style_doc = frappe.get_doc("Style", style)
 	bom_items = get_effective_bom_items(style_doc)
@@ -261,12 +266,14 @@ def generate_sku(style, colour_code, size_code, generate_all=False):
 	target_row.item_code = item.item_code
 	target_row.bom = bom_name
 	target_row.status = "Active"
+	target_row.production_for_sku = target_row.get("production_for_sku") or 1  # Ensure it's marked for production
 
-	# Generate all ungenerated SKUs only for the explicit bulk action.
+	# Generate all ungenerated SKUs only for the explicit bulk action that are marked for production.
 	if frappe.utils.cint(generate_all):
 		pending_rows = [
 			r for r in style_doc.matrix_items
-			if r.status == "Not Generated" or (r.status == "Active" and r.item and not r.bom)
+			if (r.status == "Not Generated" or (r.status == "Active" and r.item and not r.bom))
+			and (r.get("production_for_sku") or 1)  # Only generate if marked for production
 		]
 	else:
 		pending_rows = []
@@ -343,6 +350,52 @@ def set_matrix_item_status(style, matrix_item, status):
 	style_doc.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {"status": status}
+
+
+@frappe.whitelist()
+def get_production_selection_matrix(style):
+	"""Return matrix data for production selection dialog."""
+	style_doc = frappe.get_doc("Style", style)
+	
+	# Group matrix items by colour and size
+	matrix_data = []
+	for row in style_doc.matrix_items:
+		matrix_data.append({
+			"name": row.name,
+			"colour": row.colour,
+			"colour_code": row.colour_code,
+			"size": row.size,
+			"size_code": row.size_code,
+			"sku": row.sku or f"{style_doc.style_no}-{row.colour_code}-{row.size_code}",
+			"status": row.status,
+			"production_for_sku": row.get("production_for_sku") or 1,  # Default to 1 (true)
+			"has_bom": bool(row.bom)
+		})
+	
+	return {"matrix_items": matrix_data}
+
+
+@frappe.whitelist()
+def save_production_selection(style, selection_data):
+	"""Save which colour/size/BOM combinations are for production."""
+	import json
+	
+	if isinstance(selection_data, str):
+		selection_data = json.loads(selection_data)
+	
+	style_doc = frappe.get_doc("Style", style)
+	
+	# Update matrix items with production selection
+	for item_data in selection_data:
+		for row in style_doc.matrix_items:
+			if row.name == item_data.get("name"):
+				row.production_for_sku = item_data.get("production_for_sku", 1)
+				break
+	
+	style_doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	
+	return {"success": True, "message": _("Production selection saved successfully.")}
 
 
 def _get_or_create_item_group(name):
@@ -508,6 +561,11 @@ def _create_bom_for_item(style_doc, item, bom_items=None):
 	if not bom_items:
 		frappe.throw(_("Add at least one BOM material before generating SKUs."))
 
+	# Filter to only include materials that are available in market
+	available_items = [row for row in bom_items if row.get("available_in_market", 1)]
+	if not available_items:
+		frappe.throw(_("No available materials found for BOM. Check if materials are marked 'Available in Market'."))
+
 	existing = frappe.db.get_value(
 		"BOM", {"item": item.item_code, "is_active": 1, "docstatus": ["<", 2]}, "name"
 	)
@@ -526,7 +584,7 @@ def _create_bom_for_item(style_doc, item, bom_items=None):
 	bom.is_default = 1
 	bom.with_operations = 0
 
-	for row in bom_items:
+	for row in available_items:
 		component_code = _get_or_create_component_item(row)
 		bom.append("items", {
 			"item_code": component_code,
