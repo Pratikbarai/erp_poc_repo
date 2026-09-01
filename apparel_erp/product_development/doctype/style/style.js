@@ -623,7 +623,7 @@ function generate_all_skus(frm) {
 }
 
 function show_production_selection_dialog(frm) {
-	"""Open a dialog for users to select which colour/size/BOM combinations will go to production."""
+	//"""Open a dialog for users to select which colour/size/BOM combinations will go to production."""
 	frappe.call({
 		method: "apparel_erp.product_development.doctype.style.style.get_production_selection_matrix",
 		args: { style: frm.doc.name },
