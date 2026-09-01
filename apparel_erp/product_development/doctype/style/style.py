@@ -21,6 +21,25 @@ BOM_ITEM_FIELDS = (
 
 class Style(Document):
 	def validate(self):
+		# Check if linked Design Tech Pack has production confirmed
+		tech_pack = frappe.db.get_value(
+			"Design Tech Pack",
+			{"style": self.name},
+			["name", "production_confirmed"],
+			as_dict=True
+		)
+		
+		if tech_pack and tech_pack.production_confirmed:
+			previous = self.get_doc_before_save()
+			if previous:
+				# Check if colours or BOM items have changed
+				if self.colours != previous.colours:
+					frappe.throw(_("Cannot edit Colours: Production has been confirmed in Design Tech Pack {0}. Colours are now locked.").format(tech_pack.name))
+				if self.bom_items != previous.bom_items:
+					frappe.throw(_("Cannot edit BOM Items: Production has been confirmed in Design Tech Pack {0}. BOM is now locked.").format(tech_pack.name))
+				if self.sizes != previous.sizes:
+					frappe.throw(_("Cannot edit Sizes: Production has been confirmed in Design Tech Pack {0}. Sizes are now locked.").format(tech_pack.name))
+		
 		if (self.status or "Not Started") not in STYLE_STATUSES:
 			frappe.throw(_("Status must be one of: {0}").format(", ".join(STYLE_STATUSES)))
 		self.validate_base_style()

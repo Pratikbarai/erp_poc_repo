@@ -10,6 +10,7 @@ frappe.ui.form.on("Design Tech Pack", {
 		render_next_action(frm);
 		render_design_tech_pack_image_preview(frm);
 		render_callouts(frm);
+		render_print_options(frm);
 		add_measurement_upload_action(frm);
 	},
 
@@ -345,50 +346,143 @@ function bind_edit_bom(frm, $wrapper) {
 }
 
 function render_production(frm, snapshot) {
-	const $w = frm.get_field("production_placeholder_html").$wrapper;
+	const $w = frm.get_field("production_selection_html").$wrapper;
 	$w.empty();
 
 	const colours = snapshot && snapshot.colours ? snapshot.colours : [];
+	const sizes = (frm.tp_snapshot && frm.tp_snapshot.sizes) || [];
 	const bom_items = snapshot && snapshot.bom_items ? snapshot.bom_items : [];
 	const matrix_items = snapshot && snapshot.matrix_items ? snapshot.matrix_items : [];
-	const approved_colours = colours.filter(c => c.approved_for_production);
-	const available_materials = bom_items.filter(b => b.available_in_market !== 0 && b.available_in_market !== false);
-	const selected_for_production = matrix_items.filter(row => row.production_for_sku !== 0 && row.production_for_sku !== false);
-	const generated_skus = matrix_items.filter(row => row.status === "Active" || row.item || row.bom).length;
-	const total_possible = Math.max(0, approved_colours.length * Math.max(1, (frm.tp_snapshot && frm.tp_snapshot.sizes ? frm.tp_snapshot.sizes.length : 0)));
+	const confirmed = frm.doc.production_confirmed;
 
-	const html = `
-		<div class="tp-production-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;">
-			<div class="tp-production-card">
-				<div class="tp-production-label">Approved Colours</div>
-				<div class="tp-production-value ${approved_colours.length ? "ok" : "warn"}">${approved_colours.length} / ${colours.length || 0}</div>
-			</div>
-			<div class="tp-production-card">
-				<div class="tp-production-label">Available Materials</div>
-				<div class="tp-production-value ${available_materials.length === bom_items.length ? "ok" : "warn"}">${available_materials.length} / ${bom_items.length || 0}</div>
-			</div>
-			<div class="tp-production-card">
-				<div class="tp-production-label">Selected for Production</div>
-				<div class="tp-production-value">${selected_for_production.length}</div>
-			</div>
-			<div class="tp-production-card">
-				<div class="tp-production-label">Generated SKUs</div>
-				<div class="tp-production-value">${generated_skus}</div>
-			</div>
-		</div>
-		<div style="margin-top:12px; font-size:12px; color:var(--text-muted);">
-			${total_possible ? `Possible variants: ${total_possible}` : "No approved colour/size combinations are ready yet."}
-		</div>
-		<style>
-			.tp-production-card{border:1px solid var(--border-color); border-radius:8px; padding:12px; background:#fafafa;}
-			.tp-production-label{font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); margin-bottom:6px;}
-			.tp-production-value{font-size:24px; font-weight:700; color:var(--primary);}
-			.tp-production-value.ok{color:#2e8b57;}
-			.tp-production-value.warn{color:#d97706;}
-		</style>
-	`;
+	// Build summary card
+	let html = `<div class="tp-production-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">`;
+	html += `<div class="tp-production-card">
+		<div class="tp-production-label">Status</div>
+		<div class="tp-production-value ${confirmed ? "ok" : "warn"}">${confirmed ? "Confirmed ✓" : "Pending"}</div>
+	</div>`;
+	html += `<div class="tp-production-card">
+		<div class="tp-production-label">Approved Colours</div>
+		<div class="tp-production-value">${colours.filter(c => c.approved_for_production).length} / ${colours.length || 0}</div>
+	</div>`;
+	html += `<div class="tp-production-card">
+		<div class="tp-production-label">Size Range</div>
+		<div class="tp-production-value">${sizes.length || 0}</div>
+	</div></div>`;
+
+	if (confirmed) {
+		// Show confirmed selection
+		html += `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:16px;margin:16px 0;">
+			<h5 style="color:#2e7d32;margin-top:0;">Production Selection Locked</h5>
+			<p style="color:#558b2f;margin:8px 0;">Production has been confirmed. Style and BOM editing is now disabled.</p>
+		</div>`;
+	} else {
+		// Show selection interface
+		html += `<div style="margin:20px 0;">
+			<h5>${__("Step 1: Select Colours")}</h5>
+			<div class="tp-prod-colours" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">`;
+		
+		colours.forEach(c => {
+			const checked = c.approved_for_production ? "checked" : "disabled";
+			const disabled = c.approved_for_production ? "" : "disabled";
+			html += `<label class="tp-prod-colour-label" ${disabled ? 'style="opacity:0.5;"' : ''}>
+				<input type="checkbox" class="tp-prod-colour-check" value="${frappe.utils.escape_html(c.colour_name)}" ${checked}>
+				<span class="tp-swatch-box" style="background:${c.swatch || '#eee'};width:32px;height:32px;display:inline-block;border-radius:4px;margin-right:6px;border:2px solid ${checked ? 'var(--primary)' : 'transparent'};"></span>
+				<span>${frappe.utils.escape_html(c.colour_name)}</span>
+			</label>`;
+		});
+		
+		html += `</div>
+			<h5>${__("Step 2: Select Sizes")}</h5>
+			<div class="tp-prod-sizes" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">`;
+		
+		sizes.forEach(s => {
+			html += `<label class="tp-prod-size-label">
+				<input type="checkbox" class="tp-prod-size-check" value="${frappe.utils.escape_html(s.size)}" checked>
+				<span style="border:1px solid var(--border-color);border-radius:4px;padding:6px 12px;display:inline-block;cursor:pointer;">${frappe.utils.escape_html(s.size_code || s.size)}</span>
+			</label>`;
+		});
+		
+		html += `</div>
+			<h5>${__("Step 3: Review BOM")}</h5>`;
+		
+		if (bom_items.length) {
+			html += `<div class="table-responsive" style="margin-bottom:20px;"><table class="table table-bordered">
+				<thead><tr><th>${__("Item")}</th><th>${__("Type")}</th><th>${__("Composition")}</th><th>${__("Available")}</th></tr></thead><tbody>`;
+			bom_items.forEach(b => {
+				const available = b.available_in_market ? "✓" : "✗";
+				const available_class = b.available_in_market ? "text-success" : "text-danger";
+				html += `<tr>
+					<td>${frappe.utils.escape_html(b.item_name || "")}</td>
+					<td>${frappe.utils.escape_html(b.item_type || "")}</td>
+					<td>${frappe.utils.escape_html(b.composition || "-")}</td>
+					<td class="${available_class}" style="font-weight:bold;">${available}</td>
+				</tr>`;
+			});
+			html += `</tbody></table></div>`;
+		} else {
+			html += `<div class="text-muted">${__("No BOM items defined yet.")}</div>`;
+		}
+		
+		html += `<div style="margin-top:20px;">
+			<button class="btn btn-primary tp-confirm-production">${__("Confirm Production Selection")}</button>
+			<span style="margin-left:10px;font-size:12px;color:var(--text-muted);">After confirmation, colour/size selection and BOM will be locked.</span>
+		</div>`;
+	}
+
+	html += `<style>
+		.tp-production-card{border:1px solid var(--border-color);border-radius:8px;padding:12px;background:#fafafa;}
+		.tp-production-label{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:6px;}
+		.tp-production-value{font-size:20px;font-weight:700;color:var(--primary);}
+		.tp-production-value.ok{color:#2e8b57;}
+		.tp-production-value.warn{color:#d97706;}
+		.tp-prod-colour-label,.tp-prod-size-label{display:flex;align-items:center;cursor:pointer;margin:4px;user-select:none;}
+		.tp-prod-colour-label input,.tp-prod-size-label input{margin-right:8px;cursor:pointer;}
+		.tp-prod-colour-label span:last-child,.tp-prod-size-label span{padding:4px 8px;}
+	</style>`;
 
 	$w.html(html);
+
+	// Bind event handlers
+	if (!confirmed) {
+		$w.find(".tp-confirm-production").on("click", () => {
+			const selected_colours = [];
+			const selected_sizes = [];
+			
+			$w.find(".tp-prod-colour-check:checked").each(function() {
+				selected_colours.push($(this).val());
+			});
+			
+			$w.find(".tp-prod-size-check:checked").each(function() {
+				selected_sizes.push($(this).val());
+			});
+			
+			if (!selected_colours.length || !selected_sizes.length) {
+				frappe.msgprint(__("Please select at least one colour and one size."));
+				return;
+			}
+			
+			frappe.confirm(__("Confirm production selection? After confirmation, editing will be restricted."), () => {
+				frappe.call({
+					method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.confirm_production_selection",
+					args: {
+						name: frm.doc.name,
+						colours: selected_colours,
+						sizes: selected_sizes
+					},
+					freeze: true,
+					freeze_message: __("Confirming production selection..."),
+					callback: () => {
+						frappe.show_alert({
+							message: __("Production selection confirmed!"),
+							indicator: "green"
+						});
+						frm.reload_doc();
+					}
+				});
+			});
+		});
+	}
 }
 
 function render_measurements(frm) {
@@ -660,6 +754,90 @@ function render_callouts(frm) {
 			frm.refresh_field("callouts");
 			render_callouts(frm);
 			frm.dirty();
+		});
+	});
+}
+
+function render_print_options(frm) {
+	const $w = frm.get_field("print_options_html").$wrapper;
+	if (!$w.length) return;
+	
+	$w.empty();
+	
+	const sections = [
+		{ key: "Design Sketch", label: "Design Sketch (Front & Back)", checked: true },
+		{ key: "Colourways", label: "Colourways", checked: true },
+		{ key: "Size Range", label: "Size Range & Measurements", checked: true },
+		{ key: "Measurements", label: "Detailed Measurements", checked: true },
+		{ key: "Construction Details", label: "Construction Details", checked: true },
+		{ key: "Fabric & Trims", label: "Fabric & Trims (BOM)", checked: true },
+		{ key: "Reference Images", label: "Reference Images", checked: true }
+	];
+	
+	let html = `<div style="margin:16px 0;">
+		<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Select sections to include in the printed tech pack:</p>
+		<div class="tp-print-options">`;
+	
+	sections.forEach(section => {
+		const is_selected = frm.doc.print_sections && frm.doc.print_sections.includes(section.key);
+		html += `<label class="tp-print-option-label">
+			<input type="checkbox" class="tp-print-option-check" value="${frappe.utils.escape_html(section.key)}" ${is_selected ? "checked" : ""}>
+			<span style="margin-left:6px;cursor:pointer;">${frappe.utils.escape_html(section.label)}</span>
+		</label>`;
+	});
+	
+	html += `</div>
+		<div style="margin-top:16px;">
+			<button class="btn btn-default btn-sm tp-print-preview">${__("Preview")}</button>
+			<button class="btn btn-primary btn-sm tp-print-pdf" style="margin-left:8px;">${__("Print PDF")}</button>
+			<span style="margin-left:12px;font-size:12px;color:var(--text-muted);">Choose sections above before printing</span>
+		</div>
+	</div>
+	<style>
+		.tp-print-options{display:flex;flex-direction:column;gap:8px;margin:12px 0;}
+		.tp-print-option-label{display:flex;align-items:center;cursor:pointer;padding:8px;border-radius:4px;transition:background 0.2s;}
+		.tp-print-option-label:hover{background:#f5f5f5;}
+		.tp-print-option-label input{cursor:pointer;}
+	</style>`;
+	
+	$w.html(html);
+	
+	// Bind event handlers
+	$w.find(".tp-print-option-check").on("change", function() {
+		const selected = [];
+		$w.find(".tp-print-option-check:checked").each(function() {
+			selected.push($(this).val());
+		});
+		frm.set_value("print_sections", selected.join("\n"));
+	});
+	
+	$w.find(".tp-print-preview").on("click", () => {
+		frappe.msgprint(__("Preview PDF - functionality can be expanded to show a preview modal."));
+	});
+	
+	$w.find(".tp-print-pdf").on("click", () => {
+		const selected_sections = [];
+		$w.find(".tp-print-option-check:checked").each(function() {
+			selected_sections.push($(this).val());
+		});
+		
+		if (!selected_sections.length) {
+			frappe.msgprint(__("Please select at least one section to print."));
+			return;
+		}
+		
+		// Use Frappe's built-in print functionality with selected sections
+		frappe.call({
+			method: "apparel_erp.product_development.doctype.design_tech_pack.design_tech_pack.generate_custom_print",
+			args: {
+				name: frm.doc.name,
+				sections: selected_sections
+			},
+			callback: (r) => {
+				if (r.message && r.message.pdf_url) {
+					window.open(r.message.pdf_url, "_blank");
+				}
+			}
 		});
 	});
 }
