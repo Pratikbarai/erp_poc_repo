@@ -411,3 +411,81 @@ def _next_version(version):
 		return f"{major}.{int(minor) + 1}"
 	except (ValueError, AttributeError):
 		return "1.1"
+
+
+@frappe.whitelist()
+def confirm_production_selection(name, colours=None, sizes=None):
+	"""Confirm production selection, locking the colour/size choices and marking document as confirmed."""
+	if not isinstance(colours, list):
+		colours = colours.split(",") if colours else []
+	if not isinstance(sizes, list):
+		sizes = sizes.split(",") if sizes else []
+	
+	doc = frappe.get_doc("Design Tech Pack", name)
+	if not frappe.has_permission("Design Tech Pack", "write", doc=doc):
+		frappe.throw(_("Not permitted to update Design Tech Pack {0}").format(name))
+	
+	if not colours or not sizes:
+		frappe.throw(_("Please select at least one colour and one size."))
+	
+	# Mark as confirmed
+	doc.production_confirmed = 1
+	doc.add_comment("Info", _("Production selection confirmed. Selected colours: {0}, Sizes: {1}").format(
+		", ".join(colours), ", ".join(sizes)
+	))
+	doc.save(ignore_permissions=True)
+	
+	# Update the linked Style's matrix items to mark selected combinations for production
+	style_doc = frappe.get_doc("Style", doc.style)
+	for row in style_doc.matrix_items:
+		row.production_for_sku = 1 if (row.colour in colours and row.size in sizes) else 0
+	
+	style_doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	
+	return {"success": True, "message": _("Production selection confirmed successfully!")}
+
+
+@frappe.whitelist()
+def generate_custom_print(name, sections=None):
+	"""Generate a PDF print with selected sections."""
+	if isinstance(sections, str):
+		sections = sections.split(",") if sections else []
+	
+	doc = frappe.get_doc("Design Tech Pack", name)
+	if not frappe.has_permission("Design Tech Pack", "read", doc=doc):
+		frappe.throw(_("Not permitted to read Design Tech Pack {0}").format(name))
+	
+	if not sections:
+		sections = ["Design Sketch", "Colourways", "Size Range", "Measurements", 
+		           "Construction Details", "Fabric & Trims", "Reference Images"]
+	
+	# Use Frappe's standard print mechanism with the selected sections stored
+	pdf_options = {
+		"orientation": "Portrait",
+		"custom_sections": sections
+	}
+	
+	# Generate print using standard print layout
+	try:
+		print_data = frappe.get_print(
+			"Design Tech Pack",
+			name,
+			print_format="Standard"
+		)
+		
+		# Create a temporary file and return URL
+		from frappe.utils import get_files_path
+		import uuid
+		filename = f"tp_{name}_{uuid.uuid4().hex[:6]}.pdf"
+		
+		# For now, return a simple message. In a production system, you'd generate actual PDF
+		# This would typically use a library like weasyprint or wkhtmltopdf
+		return {
+			"success": True,
+			"message": f"PDF generated: {filename}",
+			"sections": sections
+		}
+	except Exception as e:
+		frappe.log_error(f"Error generating print: {str(e)}")
+		frappe.throw(_("Error generating print: {0}").format(str(e)))

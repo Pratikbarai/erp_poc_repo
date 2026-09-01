@@ -501,9 +501,45 @@
       "is_custom_field": false
     },
     {
-      "fieldname": "production_placeholder_html",
+      "fieldname": "production_confirmed",
+      "fieldtype": "Check",
+      "label": "Production Confirmed",
+      "default": 0,
+      "read_only": 0,
+      "description": "Mark as confirmed to lock colour/size selection and prevent further edits to Style and BOM"
+    },
+    {
+      "fieldname": "sb_production",
+      "fieldtype": "Section Break",
+      "label": "Production Selection"
+    },
+    {
+      "fieldname": "production_selection_html",
       "fieldtype": "HTML",
-      "options": "Production planning will be available here."
+      "options": "Select colours, sizes, and BOM items to be produced."
+    },
+    {
+      "fieldname": "tab_print",
+      "fieldtype": "Tab Break",
+      "label": "Print",
+      "is_custom_field": false
+    },
+    {
+      "fieldname": "sb_print_options",
+      "fieldtype": "Section Break",
+      "label": "Print Options"
+    },
+    {
+      "fieldname": "print_sections",
+      "fieldtype": "MultiSelect",
+      "label": "Sections to Print",
+      "options": "Design Sketch\nColourways\nSize Range\nMeasurements\nConstruction Details\nFabric & Trims\nReference Images\nAll",
+      "default": "All"
+    },
+    {
+      "fieldname": "print_options_html",
+      "fieldtype": "HTML",
+      "options": "Choose which sections to include in the printed tech pack."
     }
   ],
   "permissions": [
