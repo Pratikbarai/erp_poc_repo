@@ -364,8 +364,17 @@ function render_production_readiness(frm) {
 		</div>
 	</div>`;
 	
-	const wrapper = frm.get_field("matrix_html").$wrapper;
-	wrapper.prepend(status_html);
+	// Try to render to new Production tab field if it exists, otherwise fall back to prepending to matrix
+	const production_readiness_field = frm.get_field("production_readiness_html");
+	if (production_readiness_field) {
+		production_readiness_field.$wrapper.html(status_html);
+	} else {
+		// Backwards compatibility: prepend to matrix if new field doesn't exist yet
+		const matrix_field = frm.get_field("matrix_html");
+		if (matrix_field) {
+			matrix_field.$wrapper.prepend(status_html);
+		}
+	}
 }
 
 function render_gallery(frm) {

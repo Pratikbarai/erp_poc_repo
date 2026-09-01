@@ -224,17 +224,9 @@
       "in_list_view": 1
     },
     {
-      "fieldname": "matrix_html",
-      "fieldtype": "HTML",
-      "label": "Colour - Size Matrix (Auto Generated SKUs)"
-    },
-    {
-      "fieldname": "matrix_items",
-      "fieldtype": "Table",
-      "label": "Matrix Items (Generated)",
-      "options": "Style Matrix Item",
-      "read_only": 1,
-      "hidden": 1
+      "fieldname": "tab_production",
+      "fieldtype": "Tab Break",
+      "label": "Production"
     },
     {
       "fieldname": "development_stage",
@@ -247,7 +239,36 @@
     },
     {
       "fieldname": "workflow_html",
-      "fieldtype": "HTML"
+      "fieldtype": "HTML",
+      "label": "Development Workflow"
+    },
+    {
+      "fieldname": "sb_production_readiness",
+      "fieldtype": "Section Break",
+      "label": "Production Readiness"
+    },
+    {
+      "fieldname": "production_readiness_html",
+      "fieldtype": "HTML",
+      "label": "Production Status Overview"
+    },
+    {
+      "fieldname": "sb_production_matrix",
+      "fieldtype": "Section Break",
+      "label": "Colour × Size Matrix"
+    },
+    {
+      "fieldname": "matrix_html",
+      "fieldtype": "HTML",
+      "label": "SKU Generation Matrix"
+    },
+    {
+      "fieldname": "matrix_items",
+      "fieldtype": "Table",
+      "label": "Matrix Items (Generated)",
+      "options": "Style Matrix Item",
+      "read_only": 1,
+      "hidden": 1
     }
   ],
   "modules": [],
