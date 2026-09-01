@@ -133,7 +133,9 @@ function clean_child_row(row) {
 
 function render_style_image_preview(frm) {
 	if (!frm.doc.style_image) return;
-	const $wrapper = frm.get_field("style_image").$wrapper;
+	const field = frm.get_field("style_image");
+	if (!field || !field.$wrapper) return;
+	const $wrapper = field.$wrapper;
 	$wrapper.find("img").css("max-width", "100%").css("height", "auto");
 	$wrapper.find("a").off("click").on("click", function(e) {
 		e.preventDefault();
@@ -143,7 +145,9 @@ function render_style_image_preview(frm) {
 
 function render_size_chart_preview(frm) {
 	if (!frm.doc.size_chart || !/\.(png|jpe?g|gif|webp|bmp)(\?.*)?$/i.test(frm.doc.size_chart)) return;
-	const $wrapper = frm.get_field("size_chart").$wrapper;
+	const field = frm.get_field("size_chart");
+	if (!field || !field.$wrapper) return;
+	const $wrapper = field.$wrapper;
 	if ($wrapper.find(".apparel-size-chart-preview").length) return;
 	$wrapper.append(`<img src="${frm.doc.size_chart}" class="apparel-size-chart-preview" alt="${__("Size Chart")}">`);
 	$wrapper.find(".apparel-size-chart-preview").css({
@@ -177,7 +181,12 @@ function sync_and_render(frm) {
 }
 
 function render_matrix(frm) {
-	const wrapper = frm.get_field("matrix_html").$wrapper;
+	const matrix_field = frm.get_field("matrix_html");
+	if (!matrix_field || !matrix_field.$wrapper) {
+		return; // Field not available on this form layout
+	}
+
+	const wrapper = matrix_field.$wrapper;
 	wrapper.empty();
 
 	const colours = (frm.doc.colours || []).filter(c => (c.status || "Active") === "Active");
@@ -383,7 +392,9 @@ function render_production_readiness(frm) {
 }
 
 function render_gallery(frm) {
-	const $w = frm.get_field("gallery_html").$wrapper;
+	const field = frm.get_field("gallery_html");
+	if (!field || !field.$wrapper) return;
+	const $w = field.$wrapper;
 	$w.empty();
 
 	let html = `<div class="tp-gallery-strip">`;
@@ -439,7 +450,9 @@ function render_gallery(frm) {
 }
 
 function render_workflow(frm) {
-	const $w = frm.get_field("workflow_html").$wrapper;
+	const field = frm.get_field("workflow_html");
+	if (!field || !field.$wrapper) return;
+	const $w = field.$wrapper;
 	$w.empty();
 
 	if (frm.is_new()) {
