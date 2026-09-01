@@ -320,6 +320,11 @@ function get_size_code(frm, size_link) {
 }
 
 function render_production_readiness(frm) {
+	// Skip rendering for new forms
+	if (frm.is_new()) {
+		return;
+	}
+
 	const colours = frm.doc.colours || [];
 	const approved_colours = colours.filter(c => c.approved_for_production);
 	const bom_items = frm.doc.bom_items || [];
@@ -366,12 +371,12 @@ function render_production_readiness(frm) {
 	
 	// Try to render to new Production tab field if it exists, otherwise fall back to prepending to matrix
 	const production_readiness_field = frm.get_field("production_readiness_html");
-	if (production_readiness_field) {
+	if (production_readiness_field && production_readiness_field.$wrapper) {
 		production_readiness_field.$wrapper.html(status_html);
 	} else {
 		// Backwards compatibility: prepend to matrix if new field doesn't exist yet
 		const matrix_field = frm.get_field("matrix_html");
-		if (matrix_field) {
+		if (matrix_field && matrix_field.$wrapper) {
 			matrix_field.$wrapper.prepend(status_html);
 		}
 	}
